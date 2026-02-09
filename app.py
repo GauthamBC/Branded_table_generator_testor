@@ -1530,10 +1530,16 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     let pageSize = hasPager ? (parseInt(sizeSel.value,10) || 10) : 0;
     let page = 1;
     let filter = '';
+    filter = (searchInput?.value || '').toLowerCase().trim();
 
     function isFilterActive(){
-      return !!(filter && filter.trim().length);
+      const typed = (searchInput && typeof searchInput.value === 'string')
+        ? searchInput.value.trim()
+        : '';
+      const live = (filter || '').trim();
+      return typed.length > 0 || live.length > 0;
     }
+
     
     function syncMenuOptions(){
       const filtered = isFilterActive();
