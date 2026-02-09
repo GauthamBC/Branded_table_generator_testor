@@ -1832,34 +1832,62 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     }
 
     function showRowsInClone(clone, mode){
-      const cloneTb = clone.querySelector('table.dw-table')?.tBodies?.[0];
-      if(!cloneTb) return;
-
-      const cloneRows = Array.from(cloneTb.rows).filter(r=>!r.classList.contains('dw-empty'));
-      const ordered = Array.from(tb.rows).filter(r=>!r.classList.contains('dw-empty'));
-      const visiblePositions = [];
-      for(let i=0;i<ordered.length;i++){
-        if(matchesFilter(ordered[i])) visiblePositions.push(i);
+      const cloneTb = clone.querySelector('#bt-block tbody');
+      if (!cloneTb) return;
+    
+      const cloneRows = Array.from(cloneTb.rows).filter(r => !r.classList.contains('dw-empty'));
+      const liveRows  = Array.from(tb.rows).filter(r => !r.classList.contains('dw-empty'));
+    
+      // Map: dataset idx -> clone row
+      const cloneByIdx = new Map();
+      cloneRows.forEach(r => cloneByIdx.set(String(r.dataset.idx), r));
+    
+      // Decide which dataset indices to keep
+      const keep = new Set();
+    
+      if (mode === 'current'){
+        // exactly what's visible now (after filter + paging)
+        liveRows.forEach(lr => {
+          if (lr.style.display !== 'none') keep.add(String(lr.dataset.idx));
+        });
+    
+      } else if (mode === 'top10'){
+        // first 10 from FULL DATASET order (not preview-only)
+        const allIdx = liveRows
+          .map(r => Number(r.dataset.idx))
+          .filter(n => Number.isFinite(n))
+          .sort((a, b) => a - b);
+    
+        allIdx.slice(0, 10).forEach(i => keep.add(String(i)));
+    
+      } else if (mode === 'bottom10'){
+        // last 10 from FULL DATASET order (not preview-only)
+        const allIdx = liveRows
+          .map(r => Number(r.dataset.idx))
+          .filter(n => Number.isFinite(n))
+          .sort((a, b) => a - b);
+    
+        allIdx.slice(-10).forEach(i => keep.add(String(i)));
+    
+      } else {
+        // fallback: keep all rows
+        liveRows.forEach(lr => keep.add(String(lr.dataset.idx)));
       }
-
-    const keep = new Set();
-    if(mode === 'top10'){
-      visiblePositions.slice(0, 10).forEach(i => keep.add(i));
-    }else if(mode === 'bottom10'){
-      visiblePositions.slice(-10).forEach(i => keep.add(i));
-    }else if(mode === 'current'){
-      // rows currently visible in live table (filter + pagination)
-      ordered.forEach((r, i) => {
-        if(matchesFilter(r) && r.style.display !== 'none') keep.add(i);
+    
+      // Apply visibility in clone
+      cloneRows.forEach(r => {
+        r.style.display = keep.has(String(r.dataset.idx)) ? 'table-row' : 'none';
+        r.classList.remove('dw-zebra-odd', 'dw-zebra-even');
       });
-    }
-
-      cloneRows.forEach((r, i)=>{
-        r.style.display = keep.has(i) ? 'table-row' : 'none';
+    
+      // Re-apply zebra only to visible rows, in visible order
+      const vis = cloneRows.filter(r => r.style.display !== 'none');
+      vis.forEach((r, i) => {
+        r.classList.add(i % 2 === 0 ? 'dw-zebra-odd' : 'dw-zebra-even');
       });
-
+    
       const empty = cloneTb.querySelector('.dw-empty');
-      if(empty) empty.style.display='none';
+      if (empty) empty.style.display = vis.length ? 'none' : 'table-row';
     }
 
     async function captureCloneToPng(clone, stage, filename, targetWidth){
