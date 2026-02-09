@@ -14,22 +14,6 @@ import pandas as pd
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-
-@st.cache_resource
-def http_session() -> requests.Session:
-    s = requests.Session()
-    retry = Retry(
-        total=3,
-        backoff_factor=0.4,
-        status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=("GET", "POST", "PUT", "DELETE"),
-    )
-    adapter = HTTPAdapter(max_retries=retry, pool_connections=20, pool_maxsize=20)
-    s.mount("https://", adapter)
-    s.mount("http://", adapter)
-    return s
 
 # =========================================================
 # 0) Publishing Users + Secrets (GITHUB APP)
@@ -135,7 +119,7 @@ def get_installation_id_for_user(username: str) -> int:
     app_jwt = build_github_app_jwt(GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY)
 
     # Try user install first
-    r = http_session().get(
+    r = requests.get(
         f"https://api.github.com/users/{username}/installation",
         headers=github_headers(app_jwt),
         timeout=20,
@@ -144,7 +128,7 @@ def get_installation_id_for_user(username: str) -> int:
         return int((r.json() or {}).get("id", 0) or 0)
 
     # If not found, try org install
-    r2 = http_session().get(
+    r2 = requests.get(
         f"https://api.github.com/orgs/{username}/installation",
         headers=github_headers(app_jwt),
         timeout=20,
@@ -166,7 +150,7 @@ def get_installation_token_for_user(username: str) -> str:
 
     app_jwt = build_github_app_jwt(GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY)
 
-    r = http_session().post(
+    r = requests.post(
         f"https://api.github.com/app/installations/{install_id}/access_tokens",
         headers=github_headers(app_jwt),
         timeout=20,
@@ -186,7 +170,7 @@ def ensure_repo_exists(owner: str, repo: str, install_token: str) -> bool:
     repo = (repo or "").strip()
 
     # First: check if repo exists (using GitHub App token)
-    r = http_session().get(
+    r = requests.get(
         f"{api_base}/repos/{owner}/{repo}",
         headers=github_headers(install_token),
         timeout=20,
@@ -212,7 +196,7 @@ def ensure_repo_exists(owner: str, repo: str, install_token: str) -> bool:
     # ✅ PERSONAL ACCOUNT repo creation endpoint
     create_url = f"{api_base}/user/repos"
 
-    r2 = http_session().post(
+    r2 = requests.post(
         create_url,
         headers=github_headers(GITHUB_PAT),
         json=payload,
@@ -229,7 +213,7 @@ def ensure_pages_enabled(owner: str, repo: str, token: str, branch: str = "main"
     api_base = "https://api.github.com"
     headers = github_headers(token)
 
-    r = http_session().get(f"{api_base}/repos/{owner}/{repo}/pages", headers=headers, timeout=20)
+    r = requests.get(f"{api_base}/repos/{owner}/{repo}/pages", headers=headers, timeout=20)
     if r.status_code == 200:
         return
     if r.status_code not in (404, 403):
@@ -238,7 +222,7 @@ def ensure_pages_enabled(owner: str, repo: str, token: str, branch: str = "main"
         return
 
     payload = {"source": {"branch": branch, "path": "/"}}
-    r = http_session().post(f"{api_base}/repos/{owner}/{repo}/pages", headers=headers, json=payload, timeout=20)
+    r = requests.post(f"{api_base}/repos/{owner}/{repo}/pages", headers=headers, json=payload, timeout=20)
     if r.status_code not in (201, 202):
         raise RuntimeError(f"Error Enabling GitHub Pages: {r.status_code} {r.text}")
 
@@ -257,7 +241,7 @@ def upload_file_to_github(
 
     path = (path or "").lstrip("/").strip()
     get_url = f"{api_base}/repos/{owner}/{repo}/contents/{path}"
-    r = http_session().get(get_url, headers=headers, params={"ref": branch}, timeout=20)
+    r = requests.get(get_url, headers=headers, params={"ref": branch}, timeout=20)
 
     sha = None
     if r.status_code == 200:
@@ -270,7 +254,7 @@ def upload_file_to_github(
     if sha:
         payload["sha"] = sha
 
-    r = http_session().put(get_url, headers=headers, json=payload, timeout=20)
+    r = requests.put(get_url, headers=headers, json=payload, timeout=20)
     if r.status_code not in (200, 201):
         raise RuntimeError(f"Error Uploading File: {r.status_code} {r.text}")
 
@@ -278,7 +262,7 @@ def upload_file_to_github(
 def trigger_pages_build(owner: str, repo: str, token: str) -> bool:
     api_base = "https://api.github.com"
     headers = github_headers(token)
-    r = http_session().post(f"{api_base}/repos/{owner}/{repo}/pages/builds", headers=headers, timeout=20)
+    r = requests.post(f"{api_base}/repos/{owner}/{repo}/pages/builds", headers=headers, timeout=20)
     return r.status_code in (201, 202)
 
 
@@ -291,19 +275,11 @@ def github_file_exists(owner: str, repo: str, token: str, path: str, branch: str
         if not path:
             return False
         url = f"{api_base}/repos/{owner}/{repo}/contents/{path}"
-        r = http_session().get(url, headers=headers, params={"ref": branch}, timeout=20)
+        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
         return r.status_code == 200
     except Exception:
         return False
 
-@st.cache_data(ttl=120, show_spinner=False)
-def github_file_exists_cached(owner: str, repo: str, token: str, path: str, branch: str = "main") -> bool:
-    return github_file_exists(owner, repo, token, path, branch)
-
-
-@st.cache_data(ttl=120, show_spinner=False)
-def read_github_json_cached(owner: str, repo: str, token: str, path: str, branch: str = "main") -> dict:
-    return read_github_json(owner, repo, token, path, branch)
 
 def read_github_json(owner: str, repo: str, token: str, path: str, branch: str = "main") -> dict:
     """Read a JSON file from GitHub. If missing, return {}."""
@@ -314,7 +290,7 @@ def read_github_json(owner: str, repo: str, token: str, path: str, branch: str =
         return {}
 
     url = f"{api_base}/repos/{owner}/{repo}/contents/{path}"
-    r = http_session().get(url, headers=headers, params={"ref": branch}, timeout=20)
+    r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
 
     if r.status_code == 404:
         return {}
@@ -346,7 +322,7 @@ def list_repos_for_owner(owner: str, token: str) -> list[dict]:
     headers = github_headers(token)
 
     # detect if user/org
-    r = http_session().get(f"{api_base}/users/{owner}", headers=headers, timeout=20)
+    r = requests.get(f"{api_base}/users/{owner}", headers=headers, timeout=20)
     if r.status_code != 200:
         return []
 
@@ -360,7 +336,7 @@ def list_repos_for_owner(owner: str, token: str) -> list[dict]:
         else:
             url = f"{api_base}/users/{owner}/repos"
 
-        rr = http_session().get(url, headers=headers, params={"per_page": 100, "page": page}, timeout=20)
+        rr = requests.get(url, headers=headers, params={"per_page": 100, "page": page}, timeout=20)
         if rr.status_code != 200:
             break
 
@@ -413,7 +389,7 @@ def get_all_published_widgets(owner: str, token: str) -> pd.DataFrame:
         Returns (created_by, created_utc) from latest commit touching the file.
         """
         try:
-            rr = http_session().get(
+            rr = requests.get(
                 f"{api_base}/repos/{owner}/{repo_name}/commits",
                 headers=headers,
                 params={"path": file_name, "per_page": 1},
@@ -455,7 +431,7 @@ def get_all_published_widgets(owner: str, token: str) -> pd.DataFrame:
             continue
 
         try:
-            reg = read_github_json_cached(owner, repo_name, token, "widget_registry.json", branch="main")
+            reg = read_github_json(owner, repo_name, token, "widget_registry.json", branch="main")
 
             # ✅ CASE A: Registry exists → use it
             if isinstance(reg, dict) and reg:
@@ -481,7 +457,7 @@ def get_all_published_widgets(owner: str, token: str) -> pd.DataFrame:
                         created_utc = created_utc or cu
 
                     bundle_path = f"bundles/{fname}.json"
-                    has_csv = github_file_exists_cached(
+                    has_csv = github_file_exists(
                         owner,
                         repo_name,
                         token,
@@ -502,7 +478,7 @@ def get_all_published_widgets(owner: str, token: str) -> pd.DataFrame:
 
             # ✅ CASE B: No registry → scan for html files + infer metadata
             else:
-                rr = http_session().get(
+                rr = requests.get(
                     f"{api_base}/repos/{owner}/{repo_name}/contents",
                     headers=headers,
                     params={"ref": "main"},
@@ -569,7 +545,7 @@ def update_widget_registry(
     registry_path = "widget_registry.json"
 
     # read existing registry (or empty)
-    registry = read_github_json_cached(owner, repo, token, registry_path, branch=branch)
+    registry = read_github_json(owner, repo, token, registry_path, branch=branch)
     if not isinstance(registry, dict):
         registry = {}
 
@@ -588,7 +564,7 @@ def update_widget_registry(
 def get_github_file_sha(owner: str, repo: str, token: str, path: str, branch: str = "main") -> str:
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
-    r = http_session().get(url, headers=headers, params={"ref": branch}, timeout=15)
+    r = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
     if r.status_code == 404:
         return ""  # already gone
     r.raise_for_status()
@@ -606,13 +582,13 @@ def delete_github_file(owner: str, repo: str, token: str, path: str, branch: str
         "sha": sha,
         "branch": branch,
     }
-    r = http_session().delete(url, headers=headers, json=payload, timeout=20)
+    r = requests.delete(url, headers=headers, json=payload, timeout=20)
     r.raise_for_status()
 
 def remove_from_widget_registry(owner: str, repo: str, token: str, widget_file_name: str, branch: str = "main"):
     # read registry
     registry_path = "widget_registry.json"
-    registry = read_github_json_cached(owner, repo, token, registry_path, branch=branch)
+    registry = read_github_json(owner, repo, token, registry_path, branch=branch)
     if not isinstance(registry, dict):
         registry = {}
 
@@ -2729,7 +2705,7 @@ def load_bundle_into_editor(owner: str, repo: str, token: str, widget_file_name:
 
 def is_page_live_with_hash(url: str, expected_hash: str) -> bool:
     try:
-        r = http_session().get(url, timeout=5)
+        r = requests.get(url, timeout=5)
         if r.status_code != 200:
             return False
         return f"BT_PUBLISH_HASH:{expected_hash}" in r.text
@@ -2785,7 +2761,7 @@ def wait_until_pages_live(url: str, timeout_sec: int = 60, interval_sec: float =
     end_time = time.time() + timeout_sec
     while time.time() < end_time:
         try:
-            r = http_session().get(url, timeout=10, headers={"Cache-Control": "no-cache"})
+            r = requests.get(url, timeout=10, headers={"Cache-Control": "no-cache"})
             if r.status_code == 200:
                 return True
         except Exception:
@@ -3657,104 +3633,82 @@ if main_tab == "Create New Table":
 
                 left_col, right_col = st.columns([1, 3], gap="large")
 
-# ===================== Left: Tabs =====================
-with left_col:
-    left_view = st.radio(
-        "Left view",
-        ["Edit table contents", "Get Embed Script"],
-        horizontal=True,
-        label_visibility="collapsed",
-        key="bt_left_view",
-    )
+                # ✅ Right side: Preview + Body Editor tabs
+                with right_col:
+                    preview_tab, edit_tab = st.tabs(["Preview", "Edit table content (Optional)"])
+                
+                    with preview_tab:
+                        st.markdown("### Preview")
+                        preview_slot = st.container()
+                
+                    with edit_tab:
+                        st.markdown("### Edit table content (Optional)")
+                        st.caption("Edit cells + hide columns here. Click **Apply changes to preview** to update the preview.")
+                
+                        df_live = st.session_state.get("bt_df_uploaded")
+                
+                        if not isinstance(df_live, pd.DataFrame) or df_live.empty:
+                            st.info("Upload a CSV to enable editing.")
+                        else:
+                            all_cols = list(df_live.columns)
+                
+                            st.session_state.setdefault(
+                                "bt_hidden_cols_draft",
+                                st.session_state.get("bt_hidden_cols", []) or []
+                            )
+                
+                            st.multiselect(
+                                "Hide columns",
+                                options=all_cols,
+                                default=st.session_state.get("bt_hidden_cols_draft", []),
+                                key="bt_hidden_cols_draft",
+                                help="Hidden columns will be removed from preview + final output after Apply.",
+                            )
+                
+                            hidden_cols_draft = st.session_state.get("bt_hidden_cols_draft", []) or []
+                            visible_cols = [c for c in all_cols if c not in set(hidden_cols_draft)]
+                            df_visible = df_live[visible_cols].copy()
+                
+                            edited_df_visible = st.data_editor(
+                                df_visible,
+                                use_container_width=True,
+                                hide_index=True,
+                                num_rows="fixed",
+                                key=f"bt_df_editor_{st.session_state.get('bt_editor_version', 0)}",
+                            )
 
-# ✅ Right side: ONLY run preview/editor when left_view is "Edit table contents"
-with right_col:
-    # Always create this so the renderer at the bottom can use it
-    preview_slot = st.container()
+                            c1, c2 = st.columns([1, 1])
+                            apply_clicked = c1.button("✅ Apply changes to preview", use_container_width=True)
+                            reset_clicked = c2.button(
+                                "↩ Reset table edits",
+                                use_container_width=True,
+                                on_click=reset_table_edits,
+                            )
+                            
+                            if apply_clicked:
+                                # ✅ Save hidden columns
+                                st.session_state["bt_hidden_cols"] = st.session_state.get("bt_hidden_cols_draft", []) or []
+                            
+                                # ✅ Apply edited visible columns back into the full live df
+                                base = st.session_state["bt_df_uploaded"].copy()
+                                for col in edited_df_visible.columns:
+                                    base[col] = edited_df_visible[col].values
+                            
+                                st.session_state["bt_df_uploaded"] = base
+                                st.session_state["bt_body_apply_flash"] = True
+                            
+                                st.rerun()
+                            
+                            if st.session_state.get("bt_body_apply_flash", False):
+                                st.success("Preview updated ✅")
+                                st.session_state["bt_body_apply_flash"] = False
 
-    if left_view != "Edit table contents":
-        # Hard gate: do NOT build preview/editor UI at all in embed mode
-        st.markdown("### Preview")
-        st.info("Preview is disabled while you’re in **Get Embed Script** for faster switching.")
-        # Also clear anything that may have been mounted previously
-        preview_slot.empty()
-
-        # Optional: force-hide preview checkbox if it was enabled
-        st.session_state["bt_show_preview"] = False
-
-    else:
-        right_view = st.radio(
-            "Right view",
-            ["Preview", "Edit table content (Optional)"],
-            horizontal=True,
-            label_visibility="collapsed",
-            key="bt_right_view",
-        )
-
-        if right_view == "Preview":
-            st.markdown("### Preview")
-
-        else:
-            st.markdown("### Edit table content (Optional)")
-            st.caption("Edit cells + hide columns here. Click **Apply changes to preview** to update the preview.")
-
-            df_live = st.session_state.get("bt_df_uploaded")
-
-            if not isinstance(df_live, pd.DataFrame) or df_live.empty:
-                st.info("Upload a CSV to enable editing.")
-            else:
-                all_cols = list(df_live.columns)
-
-                st.session_state.setdefault(
-                    "bt_hidden_cols_draft",
-                    st.session_state.get("bt_hidden_cols", []) or []
-                )
-
-                st.multiselect(
-                    "Hide columns",
-                    options=all_cols,
-                    default=st.session_state.get("bt_hidden_cols_draft", []),
-                    key="bt_hidden_cols_draft",
-                    help="Hidden columns will be removed from preview + final output after Apply.",
-                )
-
-                hidden_cols_draft = st.session_state.get("bt_hidden_cols_draft", []) or []
-                visible_cols = [c for c in all_cols if c not in set(hidden_cols_draft)]
-                df_visible = df_live[visible_cols].copy()
-
-                edited_df_visible = st.data_editor(
-                    df_visible,
-                    use_container_width=True,
-                    hide_index=True,
-                    num_rows="fixed",
-                    key=f"bt_df_editor_{st.session_state.get('bt_editor_version', 0)}",
-                )
-
-                c1, c2 = st.columns([1, 1])
-                apply_clicked = c1.button("✅ Apply changes to preview", use_container_width=True)
-                c2.button(
-                    "↩ Reset table edits",
-                    use_container_width=True,
-                    on_click=reset_table_edits,
-                )
-
-                if apply_clicked:
-                    st.session_state["bt_hidden_cols"] = st.session_state.get("bt_hidden_cols_draft", []) or []
-
-                    base = st.session_state["bt_df_uploaded"].copy()
-                    for col in edited_df_visible.columns:
-                        base[col] = edited_df_visible[col].values
-
-                    st.session_state["bt_df_uploaded"] = base
-                    st.session_state["bt_body_apply_flash"] = True
-                    st.rerun()
-
-                if st.session_state.get("bt_body_apply_flash", False):
-                    st.success("Preview updated ✅")
-                    st.session_state["bt_body_apply_flash"] = False
+                # ===================== Left: Tabs =====================
+                with left_col:
+                    tab_edit, tab_embed = st.tabs(["Edit table contents", "Get Embed Script"])
 
                     # ---------- EDIT TAB ----------
-                    if left_view == "Edit table contents":
+                    with tab_edit:
                         st.markdown("#### Edit table contents")
 
                         # ✅ Confirm & Save at the top
@@ -4075,12 +4029,6 @@ with right_col:
                                     if not numeric_cols:
                                         st.warning("No numeric columns found for bars.")
                                     else:
-                                        # ✅ Prevent Streamlit crash if saved defaults include cols not in this CSV
-                                        st.session_state["bt_bar_columns"] = [
-                                            c for c in (st.session_state.get("bt_bar_columns") or [])
-                                            if c in numeric_cols
-                                        ]
-
                                         st.multiselect(
                                             "Choose columns to display as bars",
                                             options=numeric_cols,
@@ -4138,12 +4086,6 @@ with right_col:
                                     if not numeric_cols:
                                         st.warning("No numeric columns found for heatmap.")
                                     else:
-                                        # ✅ Prevent Streamlit crash if saved defaults include cols not in this CSV
-                                        st.session_state["bt_heat_columns"] = [
-                                            c for c in (st.session_state.get("bt_heat_columns") or [])
-                                            if c in numeric_cols
-                                        ]
-
                                         st.multiselect(
                                             "Choose numeric columns to shade as a heatmap",
                                             options=numeric_cols,
@@ -4151,7 +4093,6 @@ with right_col:
                                             key="bt_heat_columns",
                                             help="Applies background intensity based on value within each column.",
                                         )
-
                                         st.selectbox(
                                             "Heatmap style",
                                             options=["Branded heatmap", "Standard heatmap (5 colors)"],
@@ -4225,7 +4166,7 @@ with right_col:
                                                         st.warning(f"'{vmax}' is not a valid max for {col}.")                                   
 
                     # ---------- EMBED TAB ----------
-                    else:
+                    with tab_embed:
                         # Live publish status UI
                         if st.session_state.get("bt_publish_in_progress", False):
                             st.info("🚀 Publishing updates… This can take up to a minute.")
@@ -4305,29 +4246,13 @@ with right_col:
                         file_exists = False
                         existing_pages_url = ""
                         existing_meta = {}
-                        can_overwrite_owner = False
-                        
-                        can_check = bool(publish_owner and installation_token and repo_name and widget_file_name)
-                        
-                        check_now = st.button(
-                            "Check name availability",
-                            disabled=not can_check,
-                            use_container_width=True,
-                        )
-                        
-                        if check_now and can_check:
-                            file_exists = github_file_exists_cached(
-                                publish_owner,
-                                repo_name,
-                                installation_token,
-                                widget_file_name,
-                                branch="main",
-                            )
-                        
+
+                        if publish_owner and installation_token and repo_name and widget_file_name:
+                            file_exists = github_file_exists(publish_owner, repo_name, installation_token, widget_file_name, branch="main")
                             if file_exists:
                                 existing_pages_url = compute_pages_url(publish_owner, repo_name, widget_file_name)
                                 try:
-                                    registry = read_github_json_cached(
+                                    registry = read_github_json(
                                         publish_owner,
                                         repo_name,
                                         installation_token,
@@ -4337,20 +4262,9 @@ with right_col:
                                     existing_meta = registry.get(widget_file_name, {}) if isinstance(registry, dict) else {}
                                 except Exception:
                                     existing_meta = {}
-                        
+                                # ✅ overwrite is only allowed for the original creator
                                 existing_created_by = (existing_meta.get("created_by", "") or "").strip().lower()
                                 can_overwrite_owner = (not existing_created_by) or (existing_created_by == created_by_user)
-                        
-                        # ✅ store results so the rest of the UI logic below can use them on reruns
-                        st.session_state["bt_file_exists"] = file_exists
-                        st.session_state["bt_existing_pages_url"] = existing_pages_url
-                        st.session_state["bt_existing_meta"] = existing_meta
-                        st.session_state["bt_can_overwrite_owner"] = can_overwrite_owner
-
-                        file_exists = st.session_state.get("bt_file_exists", False)
-                        existing_pages_url = st.session_state.get("bt_existing_pages_url", "")
-                        existing_meta = st.session_state.get("bt_existing_meta", {})
-                        can_overwrite_owner = st.session_state.get("bt_can_overwrite_owner", False)
 
                         embed_done = bool((st.session_state.get("bt_last_published_url") or "").strip())
                         
@@ -4554,113 +4468,42 @@ with right_col:
                                 st.caption("Published Page")
                                 st.link_button("🔗 Open published page", published_url_val, use_container_width=True)
 
-                            # ✅ Faster than st.tabs(): only renders ONE view per rerun
-                            embed_view = st.radio(
-                                "Embed view",
-                                ["HTML Code", "IFrame"],
-                                horizontal=True,
-                                label_visibility="collapsed",
-                                key="bt_embed_view",
-                            )
-                            
-                            if embed_view == "HTML Code":
+                            html_tab, iframe_tab = st.tabs(["HTML Code", "IFrame"])
+
+                            with html_tab:
                                 html_code_val = (st.session_state.get("bt_html_code") or "").strip()
                                 if not html_code_val:
                                     st.info("Click **Confirm & Save** to generate HTML.")
                                 else:
                                     st.caption("HTML Code")
-                            
-                                    # ✅ Rendering huge st.code blocks is slow — use text_area (faster) + optional code view
-                                    st.text_area(
-                                        "HTML Code",
-                                        value=html_code_val,
-                                        height=340,
-                                        label_visibility="collapsed",
-                                        key="bt_html_code_view",
-                                    )
-                            
-                                    st.download_button(
-                                        "Download HTML file",
-                                        data=html_code_val,
-                                        file_name="table.html",
-                                        mime="text/html",
-                                        use_container_width=True,
-                                    )
-                            
-                            else:
+                                    with st.container(height=340):
+                                        st.code(html_code_val, language="html")
+
+                            with iframe_tab:
                                 iframe_val = (st.session_state.get("bt_iframe_code") or "").strip()
                                 st.caption("IFrame Code")
-                            
-                                st.text_area(
-                                    "IFrame Code",
-                                    value=iframe_val or "",
-                                    height=160,
-                                    label_visibility="collapsed",
-                                    key="bt_iframe_code_view",
-                                )
-                            
-                                st.download_button(
-                                    "Download iframe snippet",
-                                    data=iframe_val or "",
-                                    file_name="iframe-snippet.html",
-                                    mime="text/html",
-                                    use_container_width=True,
-                                )
+                                with st.container(height=160):
+                                    st.code(iframe_val or "", language="html")
 
-                # ✅ Render preview LAST (HARD-GATED: do NOT run on Get embed script)
-                _left_view = st.session_state.get("bt_left_view", "Edit table contents")
-                _right_view = st.session_state.get("bt_right_view", "Preview")
+                # ✅ Render preview LAST (ONLY inside Create tab)
+                with preview_slot:
+                    live_cfg = draft_config_from_state()
+                    live_rules = st.session_state.get("bt_col_format_rules", {})
                 
-                # Only render preview when:
-                # - Left view is "Edit table contents"
-                # - Right view is "Preview"
-                if _left_view == "Edit table contents" and _right_view == "Preview":
-                    with preview_slot:
-                        st.session_state.setdefault("bt_show_preview", False)
-                        st.checkbox("Show live preview", key="bt_show_preview")
+                    df_preview = st.session_state["bt_df_uploaded"].copy()
+                    hidden_cols = st.session_state.get("bt_hidden_cols", []) or []
+                    if hidden_cols:
+                        df_preview = df_preview.drop(columns=hidden_cols, errors="ignore")
+                        
+                    # ✅ NEW: limit preview rows
+                    PREVIEW_LIMIT = 100
+                    if len(df_preview) > PREVIEW_LIMIT:
+                        st.info(f"Preview limited to first {PREVIEW_LIMIT} rows for performance. Full table appears in the published page.")
+                        df_preview = df_preview.head(PREVIEW_LIMIT)
                 
-                        if not st.session_state["bt_show_preview"]:
-                            st.info("Preview hidden for performance.")
-                        else:
-                            live_cfg = draft_config_from_state()
-                            live_rules = st.session_state.get("bt_col_format_rules", {})
-                
-                            df_preview = st.session_state["bt_df_uploaded"].copy()
-                            hidden_cols = st.session_state.get("bt_hidden_cols", []) or []
-                            if hidden_cols:
-                                df_preview = df_preview.drop(columns=hidden_cols, errors="ignore")
-                
-                            PREVIEW_LIMIT = 100
-                            if len(df_preview) > PREVIEW_LIMIT:
-                                st.info(
-                                    f"Preview limited to first {PREVIEW_LIMIT} rows for performance. "
-                                    f"Full table appears in the published page."
-                                )
-                                df_preview = df_preview.head(PREVIEW_LIMIT)
-                
-                            cfg_hash = stable_config_hash(live_cfg)
-                
-                            try:
-                                df_hash = int(pd.util.hash_pandas_object(df_preview, index=True).sum())
-                            except Exception:
-                                df_hash = hash((df_preview.shape, tuple(df_preview.columns)))
-                
-                            rules_hash = hash(json.dumps(live_rules, sort_keys=True, default=str))
-                            preview_key = f"{cfg_hash}|{df_hash}|{rules_hash}"
-                
-                            if st.session_state.get("bt_preview_key") != preview_key:
-                                st.session_state["bt_preview_key"] = preview_key
-                                st.session_state["bt_preview_html"] = html_from_config(
-                                    df_preview,
-                                    live_cfg,
-                                    col_format_rules=live_rules,
-                                )
-                
-                            components.html(
-                                st.session_state.get("bt_preview_html", ""),
-                                height=820,
-                                scrolling=True,
-                            )
-                else:
-                    # Clear any previously mounted preview so it does NOT persist visually
-                    preview_slot.empty()
+                    live_preview_html = html_from_config(
+                        df_preview,
+                        live_cfg,
+                        col_format_rules=live_rules,
+                    )
+                    components.html(live_preview_html, height=820, scrolling=True)
