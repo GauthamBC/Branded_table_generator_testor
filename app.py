@@ -2116,10 +2116,6 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     
       return '<!doctype html>\n' + clone.outerHTML;
     }
-    
-    function getFullHtml(){
-      return document.documentElement.outerHTML;
-    }
 
     async function onEmbedClick(){
       hideMenu();
