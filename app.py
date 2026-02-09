@@ -4245,6 +4245,8 @@ if main_tab == "Create New Table":
 
                         st.session_state.setdefault("bt_embed_started", False)
                         st.session_state.setdefault("bt_embed_show_html", False)
+                        st.session_state.setdefault("bt_update_confirm_text", "")
+                        st.session_state.setdefault("bt_existing_created_by", "")
 
                         html_generated = bool(st.session_state.get("bt_html_generated", False))
                         created_by_user = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
@@ -4256,10 +4258,9 @@ if main_tab == "Create New Table":
                         embed_stale = bool(st.session_state.get("bt_embed_stale", False))
                     
                         if embed_generated and embed_stale:
-                            st.warning("Your embed scripts are out of date. Click **Update embed scripts** to publish the latest confirmed version.")
+                            st.warning("Your embed scripts are out of date. Click **Create embed script** to publish the latest confirmed version.")
                     
-                        btn_label = "Update embed scripts" if (embed_generated and embed_stale) else "Get embed script"
-
+                        btn_label = "Create embed script"
 
                         if not html_generated:
                             st.warning("Click **Confirm & Save** first so the latest HTML is generated.")
@@ -4310,12 +4311,11 @@ if main_tab == "Create New Table":
                         can_check = bool(publish_owner and installation_token and repo_name and widget_file_name)
                         
                         check_now = st.button(
-                            "Check name availability",
                             disabled=not can_check,
                             use_container_width=True,
                         )
                         
-                        if check_now and can_check:
+                        if can_check:
                             file_exists = github_file_exists_cached(
                                 publish_owner,
                                 repo_name,
@@ -4346,11 +4346,13 @@ if main_tab == "Create New Table":
                         st.session_state["bt_existing_pages_url"] = existing_pages_url
                         st.session_state["bt_existing_meta"] = existing_meta
                         st.session_state["bt_can_overwrite_owner"] = can_overwrite_owner
+                        st.session_state["bt_existing_created_by"] = existing_created_by 
 
                         file_exists = st.session_state.get("bt_file_exists", False)
                         existing_pages_url = st.session_state.get("bt_existing_pages_url", "")
                         existing_meta = st.session_state.get("bt_existing_meta", {})
                         can_overwrite_owner = st.session_state.get("bt_can_overwrite_owner", False)
+                        existing_created_by = st.session_state.get("bt_existing_created_by", "")
 
                         embed_done = bool((st.session_state.get("bt_last_published_url") or "").strip())
                         
@@ -4374,31 +4376,22 @@ if main_tab == "Create New Table":
                                 )
                         
                             if can_overwrite_owner:
-                                st.checkbox(
-                                    "Overwrite existing page",
-                                    value=bool(st.session_state.get("bt_allow_swap", False)),
-                                    key="bt_allow_swap",
+                                st.warning("This table already exists. To update it, type **UPDATE** below.")
+                                st.text_input(
+                                    "Type UPDATE to confirm overwrite",
+                                    key="bt_update_confirm_text",
+                                    placeholder="UPDATE",
                                 )
                             else:
-                                # ✅ ensure swap cannot be enabled for non-owners
-                                st.session_state["bt_allow_swap"] = False
-                            
-                                st.checkbox(
-                                    "Overwrite existing page",
-                                    value=False,
-                                    key="bt_allow_swap_disabled",
-                                    disabled=True,
-                                    help=f"Only the original creator ({existing_created_by or 'unknown'}) can overwrite this page.",
-                                )
+                                # non-owner can never overwrite
+                                st.session_state["bt_update_confirm_text"] = ""
                                 owner_label = f"{existing_created_by}'s" if existing_created_by else "another user's"
-                                st.warning(
-                                    f"⛔ This is **{owner_label} page**, so you can’t overwrite it."
-                                )
+                                st.warning(f"⛔ This is **{owner_label} page**, so you can’t overwrite it.")
                         
-                        # ✅ Read AFTER the checkbox renders
-                        allow_swap = bool(st.session_state.get("bt_allow_swap", False))
-                        
-                        swap_confirmed = (not file_exists) or (allow_swap and can_overwrite_owner) or same_target_as_last_publish
+                        # ✅ Read typed confirmation
+                        update_text = (st.session_state.get("bt_update_confirm_text", "") or "").strip().upper()
+                        update_confirmed = (update_text == "UPDATE")   
+                        swap_confirmed = (not file_exists) or (update_confirmed and can_overwrite_owner) or same_target_as_last_publish
                         
                         can_publish = bool(
                             html_generated
@@ -4428,7 +4421,7 @@ if main_tab == "Create New Table":
                                 if not can_overwrite_owner:
                                     missing.append("you can’t overwrite (different creator)")
                                 else:
-                                    missing.append("confirm override (checkbox)")
+                                    missing.append("type UPDATE to confirm overwrite")
                             if missing:
                                 st.caption("To enable publishing: " + ", ".join(missing) + ".")
 
