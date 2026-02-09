@@ -1580,42 +1580,60 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     function textOf(tr,i){ return (tr.children[i].innerText||'').trim(); }
 
     function sortBy(colIdx, type, th){
-      const rows = Array.from(tb.rows).filter(r=>!r.classList.contains('dw-empty'));
+      // ✅ sort against FULL dataset (not current page only)
+      const rows = ALL_ROWS.slice();
+    
       const current = th.dataset.sort || 'none';
-      const next = current==='none' ? 'asc' : current==='asc' ? 'desc' : 'none';
-
+      const next = current === 'none' ? 'asc' : current === 'asc' ? 'desc' : 'none';
+    
       heads.forEach(h=>{
-        h.dataset.sort='none';
+        h.dataset.sort = 'none';
         h.setAttribute('aria-sort','none');
         h.classList.remove('is-sorted');
       });
-
+    
+      // reset to original order
       if(next === 'none'){
         rows.sort((a,b)=>(+a.dataset.idx)-(+b.dataset.idx));
         rows.forEach(r=>tb.insertBefore(r, emptyRow));
+        page = 1;
         renderPage();
         return;
       }
-
+    
       th.dataset.sort = next;
-      th.setAttribute('aria-sort', next==='asc'?'ascending':'descending');
-
-      const mul = next==='asc'?1:-1;
+      th.setAttribute('aria-sort', next === 'asc' ? 'ascending' : 'descending');
+      th.classList.add('is-sorted');
+    
+      const mul = next === 'asc' ? 1 : -1;
+    
       rows.sort((a,b)=>{
-        let v1=textOf(a,colIdx), v2=textOf(b,colIdx);
-        if((type||'text')==='num'){
-          v1=parseFloat(v1.replace(/[^0-9.\-]/g,'')); if(isNaN(v1)) v1=-Infinity;
-          v2=parseFloat(v2.replace(/[^0-9.\-]/g,'')); if(isNaN(v2)) v2=-Infinity;
+        let v1 = textOf(a,colIdx);
+        let v2 = textOf(b,colIdx);
+    
+        // force numeric on rank-like columns too
+        const isNum = (type || 'text') === 'num';
+    
+        if(isNum){
+          v1 = parseFloat(String(v1).replace(/[^0-9.\-]/g,''));
+          v2 = parseFloat(String(v2).replace(/[^0-9.\-]/g,''));
+          if(Number.isNaN(v1)) v1 = -Infinity;
+          if(Number.isNaN(v2)) v2 = -Infinity;
         }else{
-          v1=(v1+'').toLowerCase();
-          v2=(v2+'').toLowerCase();
+          v1 = String(v1).toLowerCase();
+          v2 = String(v2).toLowerCase();
         }
-        if(v1>v2) return 1*mul;
-        if(v1<v2) return -1*mul;
+    
+        if(v1 > v2) return 1 * mul;
+        if(v1 < v2) return -1 * mul;
         return 0;
       });
+    
+      // write sorted order back to tbody
       rows.forEach(r=>tb.insertBefore(r, emptyRow));
-      th.classList.add('is-sorted');
+    
+      // ✅ always go to page 1 after sort
+      page = 1;
       renderPage();
     }
 
