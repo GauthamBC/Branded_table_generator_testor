@@ -4532,27 +4532,63 @@ if main_tab == "Create New Table":
                                 st.caption("Published Page")
                                 st.link_button("🔗 Open published page", published_url_val, use_container_width=True)
 
-                            html_tab, iframe_tab = st.tabs(["HTML Code", "IFrame"])
-
-                            with html_tab:
+                            # ✅ Faster than st.tabs(): only renders ONE view per rerun
+                            embed_view = st.radio(
+                                "Embed view",
+                                ["HTML Code", "IFrame"],
+                                horizontal=True,
+                                label_visibility="collapsed",
+                                key="bt_embed_view",
+                            )
+                            
+                            if embed_view == "HTML Code":
                                 html_code_val = (st.session_state.get("bt_html_code") or "").strip()
                                 if not html_code_val:
                                     st.info("Click **Confirm & Save** to generate HTML.")
                                 else:
                                     st.caption("HTML Code")
-                                    with st.container(height=340):
-                                        st.code(html_code_val, language="html")
-
-                            with iframe_tab:
+                            
+                                    # ✅ Rendering huge st.code blocks is slow — use text_area (faster) + optional code view
+                                    st.text_area(
+                                        "HTML Code",
+                                        value=html_code_val,
+                                        height=340,
+                                        label_visibility="collapsed",
+                                        key="bt_html_code_view",
+                                    )
+                            
+                                    st.download_button(
+                                        "Download HTML file",
+                                        data=html_code_val,
+                                        file_name="table.html",
+                                        mime="text/html",
+                                        use_container_width=True,
+                                    )
+                            
+                            else:
                                 iframe_val = (st.session_state.get("bt_iframe_code") or "").strip()
                                 st.caption("IFrame Code")
-                                with st.container(height=160):
-                                    st.code(iframe_val or "", language="html")
+                            
+                                st.text_area(
+                                    "IFrame Code",
+                                    value=iframe_val or "",
+                                    height=160,
+                                    label_visibility="collapsed",
+                                    key="bt_iframe_code_view",
+                                )
+                            
+                                st.download_button(
+                                    "Download iframe snippet",
+                                    data=iframe_val or "",
+                                    file_name="iframe-snippet.html",
+                                    mime="text/html",
+                                    use_container_width=True,
+                                )
 
                 # ✅ Render preview LAST (ONLY inside Create tab)
                 with preview_slot:
                     # Optional (but recommended): don’t render preview unless user wants it
-                    st.session_state.setdefault("bt_show_preview", True)
+                    st.session_state.setdefault("bt_show_preview", False)
                     st.checkbox("Show live preview", key="bt_show_preview")
                 
                     if not st.session_state["bt_show_preview"]:
