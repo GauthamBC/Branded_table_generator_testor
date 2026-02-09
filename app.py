@@ -1838,49 +1838,38 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       const cloneRows = Array.from(cloneTb.rows).filter(r => !r.classList.contains('dw-empty'));
       const liveRows  = Array.from(tb.rows).filter(r => !r.classList.contains('dw-empty'));
     
-      // Map: dataset idx -> clone row
-      const cloneByIdx = new Map();
-      cloneRows.forEach(r => cloneByIdx.set(String(r.dataset.idx), r));
-    
-      // Decide which dataset indices to keep
       const keep = new Set();
     
+      // Full dataset order (stable by original idx)
+      const allIdxAsc = liveRows
+        .map(r => Number(r.dataset.idx))
+        .filter(n => Number.isFinite(n))
+        .sort((a,b) => a - b);
+    
       if (mode === 'current'){
-        // exactly what's visible now (after filter + paging)
+        // current visible rows only (filter + paging)
         liveRows.forEach(lr => {
           if (lr.style.display !== 'none') keep.add(String(lr.dataset.idx));
         });
     
       } else if (mode === 'top10'){
-        // first 10 from FULL DATASET order (not preview-only)
-        const allIdx = liveRows
-          .map(r => Number(r.dataset.idx))
-          .filter(n => Number.isFinite(n))
-          .sort((a, b) => a - b);
-    
-        allIdx.slice(0, 10).forEach(i => keep.add(String(i)));
+        allIdxAsc.slice(0, 10).forEach(i => keep.add(String(i)));
     
       } else if (mode === 'bottom10'){
-        // last 10 from FULL DATASET order (not preview-only)
-        const allIdx = liveRows
-          .map(r => Number(r.dataset.idx))
-          .filter(n => Number.isFinite(n))
-          .sort((a, b) => a - b);
-    
-        allIdx.slice(-10).forEach(i => keep.add(String(i)));
+        allIdxAsc.slice(-10).forEach(i => keep.add(String(i)));
     
       } else {
-        // fallback: keep all rows
-        liveRows.forEach(lr => keep.add(String(lr.dataset.idx)));
+        allIdxAsc.forEach(i => keep.add(String(i)));
       }
     
-      // Apply visibility in clone
+      // Apply visibility to clone by idx
       cloneRows.forEach(r => {
-        r.style.display = keep.has(String(r.dataset.idx)) ? 'table-row' : 'none';
+        const on = keep.has(String(r.dataset.idx));
+        r.style.display = on ? 'table-row' : 'none';
         r.classList.remove('dw-zebra-odd', 'dw-zebra-even');
       });
     
-      // Re-apply zebra only to visible rows, in visible order
+      // Re-zebra in visible order
       const vis = cloneRows.filter(r => r.style.display !== 'none');
       vis.forEach((r, i) => {
         r.classList.add(i % 2 === 0 ? 'dw-zebra-odd' : 'dw-zebra-even');
