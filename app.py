@@ -4029,6 +4029,12 @@ if main_tab == "Create New Table":
                                     if not numeric_cols:
                                         st.warning("No numeric columns found for bars.")
                                     else:
+                                        # ✅ Prevent Streamlit crash if saved defaults include cols not in this CSV
+                                        st.session_state["bt_bar_columns"] = [
+                                            c for c in (st.session_state.get("bt_bar_columns") or [])
+                                            if c in numeric_cols
+                                        ]
+
                                         st.multiselect(
                                             "Choose columns to display as bars",
                                             options=numeric_cols,
@@ -4086,6 +4092,12 @@ if main_tab == "Create New Table":
                                     if not numeric_cols:
                                         st.warning("No numeric columns found for heatmap.")
                                     else:
+                                        # ✅ Prevent Streamlit crash if saved defaults include cols not in this CSV
+                                        st.session_state["bt_heat_columns"] = [
+                                            c for c in (st.session_state.get("bt_heat_columns") or [])
+                                            if c in numeric_cols
+                                        ]
+
                                         st.multiselect(
                                             "Choose numeric columns to shade as a heatmap",
                                             options=numeric_cols,
@@ -4093,6 +4105,7 @@ if main_tab == "Create New Table":
                                             key="bt_heat_columns",
                                             help="Applies background intensity based on value within each column.",
                                         )
+
                                         st.selectbox(
                                             "Heatmap style",
                                             options=["Branded heatmap", "Standard heatmap (5 colors)"],
