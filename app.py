@@ -1415,12 +1415,19 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
           <button class="dw-btn dw-download" id="dw-download-png" type="button">Embed / Download</button>
 
           <div id="dw-download-menu" class="dw-download-menu vi-hide" aria-label="Download Menu">
-            <div class="dw-menu-title" id="dw-menu-title">Choose action</div>
-            <button type="button" class="dw-menu-btn" id="dw-dl-top10">Download Top 10</button>
-            <button type="button" class="dw-menu-btn" id="dw-dl-bottom10">Download Bottom 10</button>
-            <button type="button" class="dw-menu-btn" id="dw-dl-csv">Download CSV</button>
-            <button type="button" class="dw-menu-btn" id="dw-embed-script">Copy HTML</button>
-          </div>
+              <div class="dw-menu-title" id="dw-menu-title">Choose action</div>
+            
+              <!-- Full table options -->
+              <button type="button" class="dw-menu-btn" id="dw-dl-top10">Download Top 10</button>
+              <button type="button" class="dw-menu-btn" id="dw-dl-bottom10">Download Bottom 10</button>
+              <button type="button" class="dw-menu-btn" id="dw-dl-csv">Download CSV</button>
+              <button type="button" class="dw-menu-btn" id="dw-embed-script">Copy HTML</button>
+            
+              <!-- Current view options (shown only when filter is active) -->
+              <button type="button" class="dw-menu-btn vi-hide" id="dw-dl-csv-current">Download Current View CSV</button>
+              <button type="button" class="dw-menu-btn vi-hide" id="dw-dl-image-current">Download Current View Image</button>
+              <button type="button" class="dw-menu-btn vi-hide" id="dw-copy-html-current">Copy Current View HTML</button>
+            </div>
         </div>
       </div>
     </div>
@@ -1495,6 +1502,12 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     const btnBottom10 = embedWrap ? embedWrap.querySelector('#dw-dl-bottom10') : null;
     const btnCsv = embedWrap ? embedWrap.querySelector('#dw-dl-csv') : null;
     const btnEmbed = embedWrap ? embedWrap.querySelector('#dw-embed-script') : null;
+    
+    // current-view buttons
+    const btnCsvCurrent = embedWrap ? embedWrap.querySelector('#dw-dl-csv-current') : null;
+    const btnImgCurrent = embedWrap ? embedWrap.querySelector('#dw-dl-image-current') : null;
+    const btnHtmlCurrent = embedWrap ? embedWrap.querySelector('#dw-copy-html-current') : null;
+    
     const menuTitle = embedWrap ? embedWrap.querySelector('#dw-menu-title') : null;
 
     const emptyRow = tb.querySelector('.dw-empty');
@@ -1517,6 +1530,17 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     let pageSize = hasPager ? (parseInt(sizeSel.value,10) || 10) : 0;
     let page = 1;
     let filter = '';
+
+    function isFilterActive(){
+      return !!(filter && filter.trim().length);
+    }
+    
+    function syncMenuOptions(){
+      const filtered = isFilterActive();
+      if (btnCsvCurrent) btnCsvCurrent.classList.toggle('vi-hide', !filtered);
+      if (btnImgCurrent) btnImgCurrent.classList.toggle('vi-hide', !filtered);
+      if (btnHtmlCurrent) btnHtmlCurrent.classList.toggle('vi-hide', !filtered);
+    }
 
     const onScrollShadow = ()=> scroller.classList.toggle('scrolled', scroller.scrollTop > 0);
     scroller.addEventListener('scroll', onScrollShadow); onScrollShadow();
@@ -1745,6 +1769,32 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       }catch(err){
         console.error("CSV export failed:", err);
       }
+    }
+    function downloadCurrentViewCsv(){
+      hideMenu();
+    
+      const headers = heads.map(th => escapeCsvCell(th.innerText || th.textContent || ""));
+      const lines = [headers.join(",")];
+    
+      const rows = Array.from(tb.rows).filter(r => !r.classList.contains('dw-empty'));
+      const visibleRows = rows.filter(r => matchesFilter(r) && r.style.display !== 'none');
+    
+      visibleRows.forEach(tr => {
+        const cells = Array.from(tr.cells).map(td => escapeCsvCell(td.innerText || td.textContent || ""));
+        lines.push(cells.join(","));
+      });
+    
+      const csv = lines.join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+    
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "current_view.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1200);
     }
 
     function showRowsInClone(clone, mode){
@@ -1981,6 +2031,36 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       }
     }
 
+    function getCurrentViewHtml(){
+      const clone = document.documentElement.cloneNode(true);
+    
+      const cloneTb = clone.querySelector('#bt-block tbody');
+      if (!cloneTb) return '<!doctype html>\n' + clone.outerHTML;
+    
+      const liveRows = Array.from(tb.rows).filter(r => !r.classList.contains('dw-empty'));
+      const cloneRows = Array.from(cloneTb.rows).filter(r => !r.classList.contains('dw-empty'));
+    
+      cloneRows.forEach((r, i) => {
+        const live = liveRows[i];
+        const visible = !!live && matchesFilter(live) && live.style.display !== 'none';
+        r.style.display = visible ? 'table-row' : 'none';
+      });
+    
+      const empty = cloneTb.querySelector('.dw-empty');
+      if (empty) empty.style.display = 'none';
+    
+      return '<!doctype html>\n' + clone.outerHTML;
+    }
+    
+    async function onEmbedCurrentClick(){
+      hideMenu();
+      const code = getCurrentViewHtml();
+      const ok = await copyToClipboard(code);
+      if (menuTitle){
+        menuTitle.textContent = ok ? 'Current view HTML copied!' : 'Copy failed (try again)';
+        setTimeout(() => { menuTitle.textContent = 'Choose action'; }, 1800);
+      }
+    }
     function getFullHtml(){
       const html = document.documentElement ? document.documentElement.outerHTML : "";
       return "<!doctype html>\n" + html;
