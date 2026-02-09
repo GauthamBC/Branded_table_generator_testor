@@ -1652,24 +1652,24 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       const syncClearBtn = ()=> searchFieldWrap.classList.toggle('has-value', !!searchInput.value);
       let t=null;
       searchInput.addEventListener('input', e=>{
-        syncClearBtn();
-        clearTimeout(t);
-        t=setTimeout(()=>{
-          filter=(e.target.value||'').toLowerCase().trim();
-          page=1;
-          renderPage();
-        },120);
-      });
-      clearBtn.addEventListener('click', ()=>{
-        searchInput.value='';
-        syncClearBtn();
-        filter='';
+      syncClearBtn();
+      clearTimeout(t);
+      t=setTimeout(()=>{
+        filter=(e.target.value||'').toLowerCase().trim();
         page=1;
         renderPage();
-        searchInput.focus();
-      });
-      syncClearBtn();
-    }
+        syncMenuOptions();
+      },120);
+    });
+      clearBtn.addEventListener('click', ()=>{
+          searchInput.value='';
+          syncClearBtn();
+          filter='';
+          page=1;
+          renderPage();
+          syncMenuOptions();
+          searchInput.focus();
+        });
 
     if(hasPager){
       sizeSel.addEventListener('change', e=>{
@@ -1808,12 +1808,17 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         if(matchesFilter(ordered[i])) visiblePositions.push(i);
       }
 
-      const keep = new Set();
-      if(mode === 'top10'){
-        visiblePositions.slice(0, 10).forEach(i => keep.add(i));
-      }else if(mode === 'bottom10'){
-        visiblePositions.slice(-10).forEach(i => keep.add(i));
-      }
+    const keep = new Set();
+    if(mode === 'top10'){
+      visiblePositions.slice(0, 10).forEach(i => keep.add(i));
+    }else if(mode === 'bottom10'){
+      visiblePositions.slice(-10).forEach(i => keep.add(i));
+    }else if(mode === 'current'){
+      // rows currently visible in live table (filter + pagination)
+      ordered.forEach((r, i) => {
+        if(matchesFilter(r) && r.style.display !== 'none') keep.add(i);
+      });
+    }
 
       cloneRows.forEach((r, i)=>{
         r.style.display = keep.has(i) ? 'table-row' : 'none';
@@ -2089,6 +2094,30 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       }
     }
 
+    function getCurrentViewHtml(){
+      const clone = document.documentElement.cloneNode(true);
+      const cloneTb = clone.querySelector('#bt-block table.dw-table tbody');
+      if(!cloneTb) return '<!doctype html>\n' + clone.outerHTML;
+    
+      const liveRows = Array.from(tb.rows).filter(r => !r.classList.contains('dw-empty'));
+      const cloneRows = Array.from(cloneTb.rows).filter(r => !r.classList.contains('dw-empty'));
+    
+      cloneRows.forEach((r, i)=>{
+        const live = liveRows[i];
+        const visible = !!live && matchesFilter(live) && live.style.display !== 'none';
+        r.style.display = visible ? 'table-row' : 'none';
+      });
+    
+      const empty = cloneTb.querySelector('.dw-empty');
+      if(empty) empty.style.display = 'none';
+    
+      return '<!doctype html>\n' + clone.outerHTML;
+    }
+    
+    function getFullHtml(){
+      return document.documentElement.outerHTML;
+    }
+
     async function onEmbedClick(){
       hideMenu();
       const code = getFullHtml();
@@ -2098,13 +2127,27 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         setTimeout(()=>{ menuTitle.textContent = 'Choose action'; }, 1800);
       }
     }
+    async function onEmbedCurrentClick(){
+      hideMenu();
+      const code = getCurrentViewHtml();
+      const ok = await copyToClipboard(code);
+    
+      if (menuTitle){
+        menuTitle.textContent = ok ? 'Current view HTML copied!' : 'Copy failed (try again)';
+        setTimeout(() => { menuTitle.textContent = 'Choose action'; }, 1800);
+      }
+    }
 
     if(hasEmbed && btnTop10) btnTop10.addEventListener('click', ()=> downloadDomPng('top10'));
     if(hasEmbed && btnBottom10) btnBottom10.addEventListener('click', ()=> downloadDomPng('bottom10'));
     if(hasEmbed && btnCsv) btnCsv.addEventListener('click', downloadCsv);
     if(hasEmbed && btnEmbed) btnEmbed.addEventListener('click', onEmbedClick);
+    if(hasEmbed && btnCsvCurrent) btnCsvCurrent.addEventListener('click', downloadCurrentViewCsv);
+    if(hasEmbed && btnImgCurrent) btnImgCurrent.addEventListener('click', ()=> downloadDomPng('current'));
+    if(hasEmbed && btnHtmlCurrent) btnHtmlCurrent.addEventListener('click', onEmbedCurrentClick);
 
     renderPage();
+    syncMenuOptions();
   })();
   </script>
 
