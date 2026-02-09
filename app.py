@@ -1530,7 +1530,6 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     let pageSize = hasPager ? (parseInt(sizeSel.value,10) || 10) : 0;
     let page = 1;
     let filter = '';
-    let isExportingPng = false;
     filter = (searchInput?.value || '').toLowerCase().trim();
 
     function isFilterActive(){
@@ -1718,24 +1717,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
     function hideMenu(){ if(menu) menu.classList.add('vi-hide'); }
     function toggleMenu(){ if(menu) menu.classList.toggle('vi-hide'); }
-    function runPngExport(mode){
-      if (isExportingPng) return;
-      isExportingPng = true;
-    
-      if (btnTop10) btnTop10.disabled = true;
-      if (btnBottom10) btnBottom10.disabled = true;
-      if (btnImgCurrent) btnImgCurrent.disabled = true;
-    
-      Promise.resolve()
-        .then(() => downloadDomPng(mode))
-        .catch(err => console.error('PNG export failed:', err))
-        .finally(() => {
-          isExportingPng = false;
-          if (btnTop10) btnTop10.disabled = false;
-          if (btnBottom10) btnBottom10.disabled = false;
-          if (btnImgCurrent) btnImgCurrent.disabled = false;
-        });
-    }   
+
     document.addEventListener('click', (e)=>{
       if(!menu || menu.classList.contains('vi-hide')) return;
       const inMenu = menu.contains(e.target);
@@ -1882,7 +1864,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
     async function captureCloneToPng(clone, stage, filename, targetWidth){
       const cloneScroller = clone.querySelector('.dw-scroll');
-    
+
       if(cloneScroller){
         cloneScroller.style.maxHeight = 'none';
         cloneScroller.style.height = 'auto';
@@ -1891,35 +1873,38 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         cloneScroller.style.overflowY = 'visible';
         cloneScroller.classList.add('no-scroll');
       }
+
+      // ✅ export width = full table scroll width (not viewport width)
+    const w = Math.max(900, Math.ceil(targetWidth || 1200));
+    clone.style.maxWidth = "none";
+    clone.style.width = w + "px";
     
-      const w = Math.max(900, Math.ceil(targetWidth || 1200));
-      clone.style.maxWidth = "none";
-      clone.style.width = w + "px";
-    
-      const cloneTable = clone.querySelector("table.dw-table");
-      if(cloneTable){
-        cloneTable.style.width = "max-content";
-        cloneTable.style.minWidth = "100%";
-      }
-    
+    // ✅ ensure the table itself isn't constrained by parent width
+    const cloneTable = clone.querySelector("table.dw-table");
+    if(cloneTable){
+      cloneTable.style.width = "max-content";
+      cloneTable.style.minWidth = "100%";
+    }
+
       await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
       await waitForFontsAndImages(clone);
-    
+
       const fullH = Math.ceil(Math.max(
         clone.scrollHeight || 0,
         clone.offsetHeight || 0,
         clone.getBoundingClientRect().height || 0
       ));
-    
+
       const MAX_CAPTURE_AREA = 28_000_000;
       const area = Math.ceil(w) * Math.ceil(fullH);
       if(area > MAX_CAPTURE_AREA){
         stage.remove();
-        throw new Error("PNG export skipped: capture area too large.");
+        console.warn("PNG export skipped: capture area too large.", { w, fullH, area });
+        return;
       }
-    
+
       const scale = Math.min(3, Math.max(2, window.devicePixelRatio || 2));
-    
+
       const canvas = await window.html2canvas(clone, {
         backgroundColor: '#ffffff',
         scale,
@@ -1933,28 +1918,23 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         scrollX: 0,
         scrollY: 0,
       });
-    
-      // ✅ wait for blob creation (instead of callback fire-and-forget)
-      const blob = await new Promise((resolve, reject) => {
-        canvas.toBlob((b) => {
-          if (!b) return reject(new Error("PNG export failed: no blob returned."));
-          resolve(b);
-        }, 'image/png');
-      });
-    
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename + '.png';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    
-      setTimeout(() => URL.revokeObjectURL(url), 1500);
-      stage.remove();
-    
-      // tiny cooldown helps browser download queue settle
-      await new Promise(r => setTimeout(r, 220));
+
+      canvas.toBlob((blob)=>{
+        if(!blob){
+          stage.remove();
+          console.warn("PNG export failed: no blob returned.");
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename + '.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url), 1500);
+        stage.remove();
+      }, 'image/png');
     }
 
     async function downloadDomPng(mode){
@@ -2188,20 +2168,14 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       }
     }
 
-    function bindClickOnce(el, handler){
-      if(!el) return;
-      if(el.dataset.dwBound === '1') return;
-      el.dataset.dwBound = '1';
-      el.addEventListener('click', handler);
-    }
-    
-    if(hasEmbed) bindClickOnce(btnTop10, () => runPngExport('top10'));
-    if(hasEmbed) bindClickOnce(btnBottom10, () => runPngExport('bottom10'));
-    if(hasEmbed) bindClickOnce(btnImgCurrent, () => runPngExport('current'));
-    if(hasEmbed) bindClickOnce(btnCsv, downloadCsv);
-    if(hasEmbed) bindClickOnce(btnEmbed, onEmbedClick);
-    if(hasEmbed) bindClickOnce(btnCsvCurrent, downloadCurrentViewCsv);
-    if(hasEmbed) bindClickOnce(btnHtmlCurrent, onEmbedCurrentClick);
+    if(hasEmbed && btnTop10) btnTop10.addEventListener('click', ()=> downloadDomPng('top10'));
+    if(hasEmbed && btnBottom10) btnBottom10.addEventListener('click', ()=> downloadDomPng('bottom10'));
+    if(hasEmbed && btnCsv) btnCsv.addEventListener('click', downloadCsv);
+    if(hasEmbed && btnEmbed) btnEmbed.addEventListener('click', onEmbedClick);
+    if(hasEmbed && btnCsvCurrent) btnCsvCurrent.addEventListener('click', downloadCurrentViewCsv);
+    if(hasEmbed && btnImgCurrent) btnImgCurrent.addEventListener('click', ()=> downloadDomPng('current'));
+    if(hasEmbed && btnHtmlCurrent) btnHtmlCurrent.addEventListener('click', onEmbedCurrentClick);
+
     renderPage();
     syncMenuOptions();
   })();
