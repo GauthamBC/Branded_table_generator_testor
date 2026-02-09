@@ -1643,8 +1643,8 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     }
 
     function renderPage(){
-      // Always operate on full dataset order (which sortBy updates in DOM order)
-      const ordered = ALL_ROWS.slice();
+      // Always operate on CURRENT DOM order (after sortBy re-inserts rows)
+      const ordered = Array.from(tb.rows).filter(r => !r.classList.contains('dw-empty'));
       const visible = ordered.filter(matchesFilter);
       const total = visible.length;
     
