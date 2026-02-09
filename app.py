@@ -3659,13 +3659,21 @@ if main_tab == "Create New Table":
 
                 # ✅ Right side: Preview + Body Editor tabs
                 with right_col:
-                    preview_tab, edit_tab = st.tabs(["Preview", "Edit table content (Optional)"])
-                
-                    with preview_tab:
+                    right_view = st.radio(
+                        "Right view",
+                        ["Preview", "Edit table content (Optional)"],
+                        horizontal=True,
+                        label_visibility="collapsed",
+                        key="bt_right_view",
+                    )
+                    
+                    # Always create this so the preview renderer at the bottom can use it
+                    preview_slot = st.container()
+                    
+                    if right_view == "Preview":
                         st.markdown("### Preview")
-                        preview_slot = st.container()
                 
-                    with edit_tab:
+                    else:
                         st.markdown("### Edit table content (Optional)")
                         st.caption("Edit cells + hide columns here. Click **Apply changes to preview** to update the preview.")
                 
@@ -3729,10 +3737,16 @@ if main_tab == "Create New Table":
 
                 # ===================== Left: Tabs =====================
                 with left_col:
-                    tab_edit, tab_embed = st.tabs(["Edit table contents", "Get Embed Script"])
+                    left_view = st.radio(
+                        "Left view",
+                        ["Edit table contents", "Get Embed Script"],
+                        horizontal=True,
+                        label_visibility="collapsed",
+                        key="bt_left_view",
+                    )
 
                     # ---------- EDIT TAB ----------
-                    with tab_edit:
+                    if left_view == "Edit table contents":
                         st.markdown("#### Edit table contents")
 
                         # ✅ Confirm & Save at the top
@@ -4203,7 +4217,7 @@ if main_tab == "Create New Table":
                                                         st.warning(f"'{vmax}' is not a valid max for {col}.")                                   
 
                     # ---------- EMBED TAB ----------
-                    with tab_embed:
+                    else:
                         # Live publish status UI
                         if st.session_state.get("bt_publish_in_progress", False):
                             st.info("🚀 Publishing updates… This can take up to a minute.")
