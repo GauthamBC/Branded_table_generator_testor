@@ -1523,7 +1523,8 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
     const hasEmbed = !controlsHidden
       && !!embedWrap && !embedWrap.classList.contains('vi-hide')
-      && !!downloadBtn && !!menu && !!btnEmbed;
+      && !!downloadBtn && !!menu
+      && !!btnEmbed && !!btnCsvCurrent && !!btnImgCurrent && !!btnHtmlCurrent;
 
     Array.from(tb.rows).forEach((r,i)=>{ if(!r.classList.contains('dw-empty')) r.dataset.idx=i; });
 
@@ -1651,25 +1652,28 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     if(hasSearch){
       const syncClearBtn = ()=> searchFieldWrap.classList.toggle('has-value', !!searchInput.value);
       let t=null;
+    
       searchInput.addEventListener('input', e=>{
-      syncClearBtn();
-      clearTimeout(t);
-      t=setTimeout(()=>{
-        filter=(e.target.value||'').toLowerCase().trim();
-        page=1;
-        renderPage();
-        syncMenuOptions();
-      },120);
-    });
-      clearBtn.addEventListener('click', ()=>{
-          searchInput.value='';
-          syncClearBtn();
-          filter='';
+        syncClearBtn();
+        clearTimeout(t);
+        t=setTimeout(()=>{
+          filter=(e.target.value||'').toLowerCase().trim();
           page=1;
           renderPage();
           syncMenuOptions();
-          searchInput.focus();
-        });
+        },120);
+      });
+    
+      clearBtn.addEventListener('click', ()=>{
+        searchInput.value='';
+        syncClearBtn();
+        filter='';
+        page=1;
+        renderPage();
+        syncMenuOptions();
+        searchInput.focus();
+      });
+    } 
 
     if(hasPager){
       sizeSel.addEventListener('change', e=>{
