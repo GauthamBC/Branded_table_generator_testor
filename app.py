@@ -4309,21 +4309,18 @@ if main_tab == "Create New Table":
                         can_overwrite_owner = False
                         
                         can_check = bool(publish_owner and installation_token and repo_name and widget_file_name)
-                        
-                        check_now = st.button(
-                            disabled=not can_check,
-                            use_container_width=True,
-                        )
-                        
-                        if can_check:
-                            file_exists = github_file_exists_cached(
-                                publish_owner,
-                                repo_name,
-                                installation_token,
-                                widget_file_name,
-                                branch="main",
-                            )
-                        
+
+                            # Auto-check existence (no separate "Check name availability" button)
+                            if can_check:
+                                file_exists = github_file_exists_cached(
+                                    publish_owner,
+                                    repo_name,
+                                    installation_token,
+                                    widget_file_name,
+                                    branch="main",
+                                )
+                            else:
+                                file_exists = False
                             if file_exists:
                                 existing_pages_url = compute_pages_url(publish_owner, repo_name, widget_file_name)
                                 try:
