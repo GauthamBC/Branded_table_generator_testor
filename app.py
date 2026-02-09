@@ -1531,8 +1531,6 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     let page = 1;
     let filter = '';
     let isExportingPng = false;
-    const pngQueue = [];
-    let pngBusy = false;
     filter = (searchInput?.value || '').toLowerCase().trim();
 
     function isFilterActive(){
@@ -1720,7 +1718,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
     function hideMenu(){ if(menu) menu.classList.add('vi-hide'); }
     function toggleMenu(){ if(menu) menu.classList.toggle('vi-hide'); }
-    async function runPngExport(mode){
+    function runPngExport(mode){
       if (isExportingPng) return;
       isExportingPng = true;
     
@@ -1728,40 +1726,16 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       if (btnBottom10) btnBottom10.disabled = true;
       if (btnImgCurrent) btnImgCurrent.disabled = true;
     
-      try{
-        await downloadDomPng(mode);
-        await new Promise(r => setTimeout(r, 180)); // tiny cooldown
-      }catch(err){
-        console.error('PNG export failed:', err);
-      }finally{
-        isExportingPng = false;
-        if (btnTop10) btnTop10.disabled = false;
-        if (btnBottom10) btnBottom10.disabled = false;
-        if (btnImgCurrent) btnImgCurrent.disabled = false;
-      }
-    }
-    function enqueuePng(mode){
-      pngQueue.push(mode);
-      if (!pngBusy) processPngQueue();
-    }
-    
-    async function processPngQueue(){
-      if (pngBusy) return;
-      pngBusy = true;
-    
-      while (pngQueue.length){
-        const mode = pngQueue.shift();
-        try{
-          await runPngExport(mode);              // reuses your current export logic
-          await new Promise(r => setTimeout(r, 120)); // tiny settle gap
-        }catch(err){
-          console.error('PNG queue export failed:', err);
-        }
-      }
-    
-      pngBusy = false;
-    }
-    
+      Promise.resolve()
+        .then(() => downloadDomPng(mode))
+        .catch(err => console.error('PNG export failed:', err))
+        .finally(() => {
+          isExportingPng = false;
+          if (btnTop10) btnTop10.disabled = false;
+          if (btnBottom10) btnBottom10.disabled = false;
+          if (btnImgCurrent) btnImgCurrent.disabled = false;
+        });
+    }   
     document.addEventListener('click', (e)=>{
       if(!menu || menu.classList.contains('vi-hide')) return;
       const inMenu = menu.contains(e.target);
@@ -2221,9 +2195,9 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       el.addEventListener('click', handler);
     }
     
-    if(hasEmbed) bindClickOnce(btnTop10, () => enqueuePng('top10'));
-    if(hasEmbed) bindClickOnce(btnBottom10, () => enqueuePng('bottom10'));
-    if(hasEmbed) bindClickOnce(btnImgCurrent, () => enqueuePng('current'));
+    if(hasEmbed) bindClickOnce(btnTop10, () => runPngExport('top10'));
+    if(hasEmbed) bindClickOnce(btnBottom10, () => runPngExport('bottom10'));
+    if(hasEmbed) bindClickOnce(btnImgCurrent, () => runPngExport('current'));
     if(hasEmbed) bindClickOnce(btnCsv, downloadCsv);
     if(hasEmbed) bindClickOnce(btnEmbed, onEmbedClick);
     if(hasEmbed) bindClickOnce(btnCsvCurrent, downloadCurrentViewCsv);
