@@ -1482,8 +1482,8 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     const table = root.querySelector('table.dw-table');
     const tb = table ? table.tBodies[0] : null;
     const ALL_ROWS = tb ? Array.from(tb.rows).filter(r => !r.classList.contains('dw-empty')) : [];
-    const PREVIEW_LIMIT = 100;
-    const PREVIEW_ROWS = ALL_ROWS.slice(0, PREVIEW_LIMIT);
+    const PREVIEW_LIMIT = ALL_ROWS.length;     // full table
+    const PREVIEW_ROWS = ALL_ROWS;             // full table
     ALL_ROWS.forEach((r, i) => { r.dataset.idx = String(i); });
     const scroller = root.querySelector('.dw-scroll');
     const controls = root.querySelector('.dw-controls');
@@ -4795,14 +4795,6 @@ if main_tab == "Create New Table":
                             hidden_cols = st.session_state.get("bt_hidden_cols", []) or []
                             if hidden_cols:
                                 df_preview = df_preview.drop(columns=hidden_cols, errors="ignore")
-                
-                            PREVIEW_LIMIT = 100
-                            if len(df_preview) > PREVIEW_LIMIT:
-                                st.info(
-                                    f"Preview limited to first {PREVIEW_LIMIT} rows for performance. "
-                                    f"Full table appears in the published page."
-                                )
-                                df_preview = df_preview.head(PREVIEW_LIMIT)
                 
                             cfg_hash = stable_config_hash(live_cfg)
                 
