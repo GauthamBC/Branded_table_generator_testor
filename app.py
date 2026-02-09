@@ -4310,14 +4310,14 @@ if main_tab == "Create New Table":
                         
                         can_check = bool(publish_owner and installation_token and repo_name and widget_file_name)
 
-                            # Auto-check existence (no separate "Check name availability" button)
-                            if can_check:
-                                file_exists = github_file_exists_cached(
-                                    publish_owner,
-                                    repo_name,
-                                    installation_token,
-                                    widget_file_name,
-                                    branch="main",
+                        # Auto-check existence (no separate "Check name availability" button)
+                        if can_check:
+                            file_exists = github_file_exists_cached(
+                                publish_owner,
+                                repo_name,
+                                installation_token,
+                                widget_file_name,
+                                branch="main",
                                 )
                             else:
                                 file_exists = False
