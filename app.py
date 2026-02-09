@@ -1537,10 +1537,24 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     
     function syncMenuOptions(){
       const filtered = isFilterActive();
-      if (btnCsvCurrent) btnCsvCurrent.classList.toggle('vi-hide', !filtered);
-      if (btnImgCurrent) btnImgCurrent.classList.toggle('vi-hide', !filtered);
+    
+      // Full-table options
+      if (btnTop10)   btnTop10.classList.toggle('vi-hide', filtered);
+      if (btnBottom10) btnBottom10.classList.toggle('vi-hide', filtered);
+      if (btnCsv)     btnCsv.classList.toggle('vi-hide', filtered);
+      if (btnEmbed)   btnEmbed.classList.toggle('vi-hide', filtered);
+    
+      // Current-view options
+      if (btnCsvCurrent)  btnCsvCurrent.classList.toggle('vi-hide', !filtered);
+      if (btnImgCurrent)  btnImgCurrent.classList.toggle('vi-hide', !filtered);
       if (btnHtmlCurrent) btnHtmlCurrent.classList.toggle('vi-hide', !filtered);
+    
+      // Optional title clarity
+      if (menuTitle){
+        menuTitle.textContent = filtered ? 'Current view actions' : 'Choose action';
+      }
     }
+
 
     const onScrollShadow = ()=> scroller.classList.toggle('scrolled', scroller.scrollTop > 0);
     scroller.addEventListener('scroll', onScrollShadow); onScrollShadow();
