@@ -455,7 +455,7 @@ def get_all_published_widgets(owner: str, token: str) -> pd.DataFrame:
             continue
 
         try:
-            reg = read_github_json(owner, repo_name, token, "widget_registry.json", branch="main")
+            reg = read_github_json_cached(owner, repo_name, token, "widget_registry.json", branch="main")
 
             # ✅ CASE A: Registry exists → use it
             if isinstance(reg, dict) and reg:
