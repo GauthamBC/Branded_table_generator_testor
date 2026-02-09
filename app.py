@@ -2196,25 +2196,6 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       el.addEventListener('click', handler);
     }
     
-    function runPngExport(mode){
-      if (isExportingPng) return;
-      isExportingPng = true;
-    
-      if (btnTop10) btnTop10.disabled = true;
-      if (btnBottom10) btnBottom10.disabled = true;
-      if (btnImgCurrent) btnImgCurrent.disabled = true;
-    
-      Promise.resolve()
-        .then(() => downloadDomPng(mode))
-        .catch(err => console.error('PNG export failed:', err))
-        .finally(() => {
-          isExportingPng = false;
-          if (btnTop10) btnTop10.disabled = false;
-          if (btnBottom10) btnBottom10.disabled = false;
-          if (btnImgCurrent) btnImgCurrent.disabled = false;
-        });
-    }
-    
     if(hasEmbed) bindClickOnce(btnTop10, () => runPngExport('top10'));
     if(hasEmbed) bindClickOnce(btnBottom10, () => runPngExport('bottom10'));
     if(hasEmbed) bindClickOnce(btnCsv, downloadCsv);
