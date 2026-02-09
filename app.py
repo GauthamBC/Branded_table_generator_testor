@@ -14,6 +14,22 @@ import pandas as pd
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+@st.cache_resource
+def http_session() -> requests.Session:
+    s = requests.Session()
+    retry = Retry(
+        total=3,
+        backoff_factor=0.4,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=("GET", "POST", "PUT", "DELETE"),
+    )
+    adapter = HTTPAdapter(max_retries=retry, pool_connections=20, pool_maxsize=20)
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
+    return s
 
 # =========================================================
 # 0) Publishing Users + Secrets (GITHUB APP)
@@ -119,7 +135,7 @@ def get_installation_id_for_user(username: str) -> int:
     app_jwt = build_github_app_jwt(GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY)
 
     # Try user install first
-    r = requests.get(
+    r = http_session().get(
         f"https://api.github.com/users/{username}/installation",
         headers=github_headers(app_jwt),
         timeout=20,
@@ -128,7 +144,7 @@ def get_installation_id_for_user(username: str) -> int:
         return int((r.json() or {}).get("id", 0) or 0)
 
     # If not found, try org install
-    r2 = requests.get(
+    r2 = http_session().get(
         f"https://api.github.com/orgs/{username}/installation",
         headers=github_headers(app_jwt),
         timeout=20,
@@ -150,7 +166,7 @@ def get_installation_token_for_user(username: str) -> str:
 
     app_jwt = build_github_app_jwt(GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY)
 
-    r = requests.post(
+    r = http_session().post(
         f"https://api.github.com/app/installations/{install_id}/access_tokens",
         headers=github_headers(app_jwt),
         timeout=20,
@@ -170,7 +186,7 @@ def ensure_repo_exists(owner: str, repo: str, install_token: str) -> bool:
     repo = (repo or "").strip()
 
     # First: check if repo exists (using GitHub App token)
-    r = requests.get(
+    r = http_session().get(
         f"{api_base}/repos/{owner}/{repo}",
         headers=github_headers(install_token),
         timeout=20,
@@ -196,7 +212,7 @@ def ensure_repo_exists(owner: str, repo: str, install_token: str) -> bool:
     # ✅ PERSONAL ACCOUNT repo creation endpoint
     create_url = f"{api_base}/user/repos"
 
-    r2 = requests.post(
+    r2 = http_session().post(
         create_url,
         headers=github_headers(GITHUB_PAT),
         json=payload,
@@ -213,7 +229,7 @@ def ensure_pages_enabled(owner: str, repo: str, token: str, branch: str = "main"
     api_base = "https://api.github.com"
     headers = github_headers(token)
 
-    r = requests.get(f"{api_base}/repos/{owner}/{repo}/pages", headers=headers, timeout=20)
+    r = http_session().get(f"{api_base}/repos/{owner}/{repo}/pages", headers=headers, timeout=20)
     if r.status_code == 200:
         return
     if r.status_code not in (404, 403):
@@ -222,7 +238,7 @@ def ensure_pages_enabled(owner: str, repo: str, token: str, branch: str = "main"
         return
 
     payload = {"source": {"branch": branch, "path": "/"}}
-    r = requests.post(f"{api_base}/repos/{owner}/{repo}/pages", headers=headers, json=payload, timeout=20)
+    r = http_session().post(f"{api_base}/repos/{owner}/{repo}/pages", headers=headers, json=payload, timeout=20)
     if r.status_code not in (201, 202):
         raise RuntimeError(f"Error Enabling GitHub Pages: {r.status_code} {r.text}")
 
@@ -241,7 +257,7 @@ def upload_file_to_github(
 
     path = (path or "").lstrip("/").strip()
     get_url = f"{api_base}/repos/{owner}/{repo}/contents/{path}"
-    r = requests.get(get_url, headers=headers, params={"ref": branch}, timeout=20)
+    r = http_session().get(get_url, headers=headers, params={"ref": branch}, timeout=20)
 
     sha = None
     if r.status_code == 200:
@@ -254,7 +270,7 @@ def upload_file_to_github(
     if sha:
         payload["sha"] = sha
 
-    r = requests.put(get_url, headers=headers, json=payload, timeout=20)
+    r = http_session().put(get_url, headers=headers, json=payload, timeout=20)
     if r.status_code not in (200, 201):
         raise RuntimeError(f"Error Uploading File: {r.status_code} {r.text}")
 
@@ -262,7 +278,7 @@ def upload_file_to_github(
 def trigger_pages_build(owner: str, repo: str, token: str) -> bool:
     api_base = "https://api.github.com"
     headers = github_headers(token)
-    r = requests.post(f"{api_base}/repos/{owner}/{repo}/pages/builds", headers=headers, timeout=20)
+    r = http_session().post(f"{api_base}/repos/{owner}/{repo}/pages/builds", headers=headers, timeout=20)
     return r.status_code in (201, 202)
 
 
@@ -275,7 +291,7 @@ def github_file_exists(owner: str, repo: str, token: str, path: str, branch: str
         if not path:
             return False
         url = f"{api_base}/repos/{owner}/{repo}/contents/{path}"
-        r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+        r = http_session().get(url, headers=headers, params={"ref": branch}, timeout=20)
         return r.status_code == 200
     except Exception:
         return False
@@ -290,7 +306,7 @@ def read_github_json(owner: str, repo: str, token: str, path: str, branch: str =
         return {}
 
     url = f"{api_base}/repos/{owner}/{repo}/contents/{path}"
-    r = requests.get(url, headers=headers, params={"ref": branch}, timeout=20)
+    r = http_session().get(url, headers=headers, params={"ref": branch}, timeout=20)
 
     if r.status_code == 404:
         return {}
@@ -322,7 +338,7 @@ def list_repos_for_owner(owner: str, token: str) -> list[dict]:
     headers = github_headers(token)
 
     # detect if user/org
-    r = requests.get(f"{api_base}/users/{owner}", headers=headers, timeout=20)
+    r = http_session().get(f"{api_base}/users/{owner}", headers=headers, timeout=20)
     if r.status_code != 200:
         return []
 
@@ -336,7 +352,7 @@ def list_repos_for_owner(owner: str, token: str) -> list[dict]:
         else:
             url = f"{api_base}/users/{owner}/repos"
 
-        rr = requests.get(url, headers=headers, params={"per_page": 100, "page": page}, timeout=20)
+        rr = http_session().get(url, headers=headers, params={"per_page": 100, "page": page}, timeout=20)
         if rr.status_code != 200:
             break
 
@@ -389,7 +405,7 @@ def get_all_published_widgets(owner: str, token: str) -> pd.DataFrame:
         Returns (created_by, created_utc) from latest commit touching the file.
         """
         try:
-            rr = requests.get(
+            rr = http_session().get(
                 f"{api_base}/repos/{owner}/{repo_name}/commits",
                 headers=headers,
                 params={"path": file_name, "per_page": 1},
@@ -478,7 +494,7 @@ def get_all_published_widgets(owner: str, token: str) -> pd.DataFrame:
 
             # ✅ CASE B: No registry → scan for html files + infer metadata
             else:
-                rr = requests.get(
+                rr = http_session().get(
                     f"{api_base}/repos/{owner}/{repo_name}/contents",
                     headers=headers,
                     params={"ref": "main"},
@@ -564,7 +580,7 @@ def update_widget_registry(
 def get_github_file_sha(owner: str, repo: str, token: str, path: str, branch: str = "main") -> str:
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
-    r = requests.get(url, headers=headers, params={"ref": branch}, timeout=15)
+    r = http_session().get(url, headers=headers, params={"ref": branch}, timeout=15)
     if r.status_code == 404:
         return ""  # already gone
     r.raise_for_status()
@@ -582,7 +598,7 @@ def delete_github_file(owner: str, repo: str, token: str, path: str, branch: str
         "sha": sha,
         "branch": branch,
     }
-    r = requests.delete(url, headers=headers, json=payload, timeout=20)
+    r = http_session().delete(url, headers=headers, json=payload, timeout=20)
     r.raise_for_status()
 
 def remove_from_widget_registry(owner: str, repo: str, token: str, widget_file_name: str, branch: str = "main"):
@@ -2705,7 +2721,7 @@ def load_bundle_into_editor(owner: str, repo: str, token: str, widget_file_name:
 
 def is_page_live_with_hash(url: str, expected_hash: str) -> bool:
     try:
-        r = requests.get(url, timeout=5)
+        r = http_session().get(url, timeout=5)
         if r.status_code != 200:
             return False
         return f"BT_PUBLISH_HASH:{expected_hash}" in r.text
@@ -2761,7 +2777,7 @@ def wait_until_pages_live(url: str, timeout_sec: int = 60, interval_sec: float =
     end_time = time.time() + timeout_sec
     while time.time() < end_time:
         try:
-            r = requests.get(url, timeout=10, headers={"Cache-Control": "no-cache"})
+            r = http_session().get(url, timeout=10, headers={"Cache-Control": "no-cache"})
             if r.status_code == 200:
                 return True
         except Exception:
