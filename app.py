@@ -569,7 +569,7 @@ def update_widget_registry(
     registry_path = "widget_registry.json"
 
     # read existing registry (or empty)
-    registry = read_github_json(owner, repo, token, registry_path, branch=branch)
+    registry = read_github_json_cached(owner, repo, token, registry_path, branch=branch)
     if not isinstance(registry, dict):
         registry = {}
 
@@ -612,7 +612,7 @@ def delete_github_file(owner: str, repo: str, token: str, path: str, branch: str
 def remove_from_widget_registry(owner: str, repo: str, token: str, widget_file_name: str, branch: str = "main"):
     # read registry
     registry_path = "widget_registry.json"
-    registry = read_github_json(owner, repo, token, registry_path, branch=branch)
+    registry = read_github_json_cached(owner, repo, token, registry_path, branch=branch)
     if not isinstance(registry, dict):
         registry = {}
 
