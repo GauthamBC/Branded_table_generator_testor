@@ -1523,8 +1523,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
     const hasEmbed = !controlsHidden
       && !!embedWrap && !embedWrap.classList.contains('vi-hide')
-      && !!downloadBtn && !!menu
-      && !!btnEmbed && !!btnCsvCurrent && !!btnImgCurrent && !!btnHtmlCurrent;
+      && !!downloadBtn && !!menu;
 
     Array.from(tb.rows).forEach((r,i)=>{ if(!r.classList.contains('dw-empty')) r.dataset.idx=i; });
 
