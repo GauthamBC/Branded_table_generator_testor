@@ -4654,5 +4654,5 @@ if main_tab == "Create New Table":
                                 scrolling=True,
                             )
                 else:
-                    # IMPORTANT: do nothing — no preview build, no components.html mounting
-                    pass
+                    # Clear any previously mounted preview so it does NOT persist visually
+                    preview_slot.empty()
