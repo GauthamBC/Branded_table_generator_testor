@@ -3146,7 +3146,9 @@ if main_tab == "Published Tables":
                     use_container_width=True,
                     on_click=reset_pub_filters,
                 )
-            
+            # ✅ Always initialize so tab blocks never crash
+            df_view = pd.DataFrame()
+
             # ✅ Apply filters
             df_view = df_pub.copy()
             
@@ -3223,6 +3225,12 @@ if main_tab == "Published Tables":
         """,
         unsafe_allow_html=True,
     )
+    # ✅ Fallback safeguard before tabs
+    if "df_view" not in locals():
+        df_view = st.session_state.get("df_pub_cache", pd.DataFrame())
+        if not isinstance(df_view, pd.DataFrame):
+            df_view = pd.DataFrame()
+        
     tab_preview_tables, tab_delete_tables = st.tabs(
         ["Preview tables", "Delete tables (admin)"]
     )
@@ -3234,8 +3242,8 @@ if main_tab == "Published Tables":
         st.markdown("#### Delete tables (admin)")
     
         delete_cols = ["Brand", "Table Name", "Has CSV", "Pages URL", "Repo", "File", "Created By", "Created UTC"]
-        df_delete = df_view.copy()
-    
+        df_delete = df_view.copy() if isinstance(df_view, pd.DataFrame) else pd.DataFrame()
+
         # Make sure all required columns exist (prevents KeyError)
         for c in delete_cols:
             if c not in df_delete.columns:
