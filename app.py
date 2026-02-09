@@ -4302,14 +4302,15 @@ if main_tab == "Create New Table":
                         current_brand = st.session_state.get("brand_table", "")
                         repo_name = suggested_repo_name(current_brand)
                         st.session_state["bt_gh_repo"] = repo_name
-
+                        
+                        can_check = bool(publish_owner and installation_token and repo_name and widget_file_name)
+                        
                         file_exists = False
                         existing_pages_url = ""
                         existing_meta = {}
                         can_overwrite_owner = False
+                        existing_created_by = ""
                         
-                        can_check = bool(publish_owner and installation_token and repo_name and widget_file_name)
-
                         # Auto-check existence (no separate "Check name availability" button)
                         if can_check:
                             file_exists = github_file_exists_cached(
@@ -4318,9 +4319,8 @@ if main_tab == "Create New Table":
                                 installation_token,
                                 widget_file_name,
                                 branch="main",
-                                )
-                            else:
-                                file_exists = False
+                            )
+                        
                             if file_exists:
                                 existing_pages_url = compute_pages_url(publish_owner, repo_name, widget_file_name)
                                 try:
@@ -4343,14 +4343,13 @@ if main_tab == "Create New Table":
                         st.session_state["bt_existing_pages_url"] = existing_pages_url
                         st.session_state["bt_existing_meta"] = existing_meta
                         st.session_state["bt_can_overwrite_owner"] = can_overwrite_owner
-                        st.session_state["bt_existing_created_by"] = existing_created_by 
-
+                        st.session_state["bt_existing_created_by"] = existing_created_by
+                        
                         file_exists = st.session_state.get("bt_file_exists", False)
                         existing_pages_url = st.session_state.get("bt_existing_pages_url", "")
                         existing_meta = st.session_state.get("bt_existing_meta", {})
                         can_overwrite_owner = st.session_state.get("bt_can_overwrite_owner", False)
                         existing_created_by = st.session_state.get("bt_existing_created_by", "")
-
                         embed_done = bool((st.session_state.get("bt_last_published_url") or "").strip())
                         
                         # ✅ If the user already published this exact repo+file in this session,
