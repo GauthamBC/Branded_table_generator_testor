@@ -1398,37 +1398,6 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       overflow-x: visible !important;
       overflow-y: visible !important;
     }
-    /* FORCE segmented control to fill parent container */
-div[data-testid="stSegmentedControl"]{
-  width: 100% !important;
-}
-
-/* outer wrappers */
-div[data-testid="stSegmentedControl"] > div,
-div[data-testid="stSegmentedControl"] > div > div{
-  width: 100% !important;
-  max-width: 100% !important;
-}
-
-/* actual radio group */
-div[data-testid="stSegmentedControl"] div[role="radiogroup"]{
-  display: flex !important;
-  width: 100% !important;
-  max-width: 100% !important;
-}
-
-/* each tab = equal width */
-div[data-testid="stSegmentedControl"] div[role="radiogroup"] > label{
-  flex: 1 1 0 !important;
-  width: 0 !important;
-  max-width: none !important;
-}
-
-/* clickable inner tab content */
-div[data-testid="stSegmentedControl"] div[role="radiogroup"] > label > div{
-  width: 100% !important;
-  justify-content: center !important;
-}
   </style>
 
   <!-- Header -->
@@ -2607,12 +2576,7 @@ def render_preview(preview_slot):
         live_cfg = draft_config_from_state()
         live_rules = st.session_state.get("bt_col_format_rules", {})
 
-        df_live = st.session_state.get("bt_df_uploaded")
-        if not isinstance(df_live, pd.DataFrame) or df_live.empty:
-            st.info("Upload a CSV to show preview.")
-            return
-        
-        df_preview = df_live.copy()
+        df_preview = st.session_state["bt_df_uploaded"].copy()
         hidden_cols = st.session_state.get("bt_hidden_cols", []) or []
         if hidden_cols:
             df_preview = df_preview.drop(columns=hidden_cols, errors="ignore")
@@ -3122,61 +3086,6 @@ st.markdown(
       div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2){
         align-self: flex-start;
       }
-            /* ✅ Segmented controls: FULL WIDTH + 50/50 buttons */
-      div[data-testid="stSegmentedControl"],
-      div[data-baseweb="segmented-control"]{
-        width: 100% !important;
-      }
-      div[data-testid="stSegmentedControl"] > div,
-      div[data-baseweb="segmented-control"] > div{
-        width: 100% !important;
-      }
-      div[data-testid="stSegmentedControl"] div[role="radiogroup"],
-      div[data-baseweb="segmented-control"] div[role="radiogroup"]{
-        width: 100% !important;
-        display: flex !important;
-      }
-      div[data-testid="stSegmentedControl"] div[role="radiogroup"] > label,
-      div[data-baseweb="segmented-control"] div[role="radiogroup"] > label{
-        flex: 1 1 0 !important;        /* each option becomes 50% */
-        max-width: none !important;
-      }
-      div[data-testid="stSegmentedControl"] div[role="radiogroup"] > label > div,
-      div[data-baseweb="segmented-control"] div[role="radiogroup"] > label > div{
-        width: 100% !important;
-        justify-content: center !important;
-      }
-      /* FORCE segmented control to fill parent container */
-div[data-testid="stSegmentedControl"]{
-  width: 100% !important;
-}
-
-/* outer wrappers */
-div[data-testid="stSegmentedControl"] > div,
-div[data-testid="stSegmentedControl"] > div > div{
-  width: 100% !important;
-  max-width: 100% !important;
-}
-
-/* actual radio group */
-div[data-testid="stSegmentedControl"] div[role="radiogroup"]{
-  display: flex !important;
-  width: 100% !important;
-  max-width: 100% !important;
-}
-
-/* each tab = equal width */
-div[data-testid="stSegmentedControl"] div[role="radiogroup"] > label{
-  flex: 1 1 0 !important;
-  width: 0 !important;
-  max-width: none !important;
-}
-
-/* clickable inner tab content */
-div[data-testid="stSegmentedControl"] div[role="radiogroup"] > label > div{
-  width: 100% !important;
-  justify-content: center !important;
-}
     </style>
     """,
     unsafe_allow_html=True,
@@ -4699,11 +4608,7 @@ with right_col:
 
         if right_view == "Preview":
             st.markdown("### Preview")
-            df_live = st.session_state.get("bt_df_uploaded")
-            if not isinstance(df_live, pd.DataFrame) or df_live.empty:
-                st.info("Upload a CSV to show preview.")
-            else:
-                render_preview(preview_slot)
+            render_preview(preview_slot)
 
         else:
             st.markdown("### Edit table content (Optional)")
