@@ -30,31 +30,7 @@ def http_session() -> requests.Session:
     s.mount("https://", adapter)
     s.mount("http://", adapter)
     return s
-def tab_switch(label: str, options: list[str], key: str, default: str | None = None):
-    """
-    Tab-looking switch with radio-like execution.
-    Uses st.segmented_control if available; falls back to horizontal radio.
-    """
-    if default is None:
-        default = options[0]
 
-    if hasattr(st, "segmented_control"):
-        return st.segmented_control(
-            label,
-            options=options,
-            default=default,
-            key=key,
-            label_visibility="collapsed",
-        )
-
-    # Fallback (older Streamlit): behaves the same, just not segmented UI
-    return st.radio(
-        label,
-        options,
-        horizontal=True,
-        key=key,
-        label_visibility="collapsed",
-    )
 # =========================================================
 # 0) Publishing Users + Secrets (GITHUB APP)
 # =========================================================
@@ -3679,15 +3655,16 @@ if main_tab == "Create New Table":
         
                 ensure_confirm_state_exists()
 
-left_col, right_col = st.columns([1, 3], gap="large")
+                left_col, right_col = st.columns([1, 3], gap="large")
 
 # ===================== Left: Tabs =====================
 with left_col:
-        left_view = tab_switch(
+    left_view = st.radio(
         "Left view",
         ["Edit table contents", "Get Embed Script"],
+        horizontal=True,
+        label_visibility="collapsed",
         key="bt_left_view",
-        default="Edit table contents",
     )
 
 # ✅ Right side: ONLY run preview/editor when left_view is "Edit table contents"
@@ -3706,12 +3683,13 @@ with right_col:
         st.session_state["bt_show_preview"] = False
 
     else:
-        right_view = tab_switch(
+        right_view = st.radio(
             "Right view",
             ["Preview", "Edit table content (Optional)"],
+            horizontal=True,
+            label_visibility="collapsed",
             key="bt_right_view",
-            default="Preview",
-        )   
+        )
 
         if right_view == "Preview":
             st.markdown("### Preview")
@@ -4577,11 +4555,12 @@ with right_col:
                                 st.link_button("🔗 Open published page", published_url_val, use_container_width=True)
 
                             # ✅ Faster than st.tabs(): only renders ONE view per rerun
-                            embed_view = tab_switch(
+                            embed_view = st.radio(
                                 "Embed view",
                                 ["HTML Code", "IFrame"],
+                                horizontal=True,
+                                label_visibility="collapsed",
                                 key="bt_embed_view",
-                                default="HTML Code",
                             )
                             
                             if embed_view == "HTML Code":
