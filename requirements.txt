@@ -1,0 +1,7 @@
+streamlit
+pandas
+requests
+matplotlib
+pillow
+pyjwt[crypto]==2.10.1
+cryptography==42.0.7
