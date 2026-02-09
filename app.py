@@ -1936,6 +1936,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         scrollY: 0,
       });
     
+      // ✅ wait for blob creation (instead of callback fire-and-forget)
       const blob = await new Promise((resolve, reject) => {
         canvas.toBlob((b) => {
           if (!b) return reject(new Error("PNG export failed: no blob returned."));
@@ -1954,7 +1955,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       setTimeout(() => URL.revokeObjectURL(url), 1500);
       stage.remove();
     
-      // small cooldown so immediate next export works reliably
+      // tiny cooldown helps browser download queue settle
       await new Promise(r => setTimeout(r, 220));
     }
 
