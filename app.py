@@ -3679,7 +3679,7 @@ if main_tab == "Create New Table":
         
                 ensure_confirm_state_exists()
 
-                left_col, right_col = st.columns([1, 3], gap="large")
+left_col, right_col = st.columns([1, 3], gap="large")
 
 # ===================== Left: Tabs =====================
 with left_col:
