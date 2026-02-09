@@ -296,6 +296,14 @@ def github_file_exists(owner: str, repo: str, token: str, path: str, branch: str
     except Exception:
         return False
 
+@st.cache_data(ttl=120, show_spinner=False)
+def github_file_exists_cached(owner: str, repo: str, token: str, path: str, branch: str = "main") -> bool:
+    return github_file_exists(owner, repo, token, path, branch)
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def read_github_json_cached(owner: str, repo: str, token: str, path: str, branch: str = "main") -> dict:
+    return read_github_json(owner, repo, token, path, branch)
 
 def read_github_json(owner: str, repo: str, token: str, path: str, branch: str = "main") -> dict:
     """Read a JSON file from GitHub. If missing, return {}."""
@@ -473,7 +481,7 @@ def get_all_published_widgets(owner: str, token: str) -> pd.DataFrame:
                         created_utc = created_utc or cu
 
                     bundle_path = f"bundles/{fname}.json"
-                    has_csv = github_file_exists(
+                    has_csv = github_file_exists_cached(
                         owner,
                         repo_name,
                         token,
@@ -4275,13 +4283,29 @@ if main_tab == "Create New Table":
                         file_exists = False
                         existing_pages_url = ""
                         existing_meta = {}
-
-                        if publish_owner and installation_token and repo_name and widget_file_name:
-                            file_exists = github_file_exists(publish_owner, repo_name, installation_token, widget_file_name, branch="main")
+                        can_overwrite_owner = False
+                        
+                        can_check = bool(publish_owner and installation_token and repo_name and widget_file_name)
+                        
+                        check_now = st.button(
+                            "Check name availability",
+                            disabled=not can_check,
+                            use_container_width=True,
+                        )
+                        
+                        if check_now and can_check:
+                            file_exists = github_file_exists_cached(
+                                publish_owner,
+                                repo_name,
+                                installation_token,
+                                widget_file_name,
+                                branch="main",
+                            )
+                        
                             if file_exists:
                                 existing_pages_url = compute_pages_url(publish_owner, repo_name, widget_file_name)
                                 try:
-                                    registry = read_github_json(
+                                    registry = read_github_json_cached(
                                         publish_owner,
                                         repo_name,
                                         installation_token,
@@ -4291,9 +4315,20 @@ if main_tab == "Create New Table":
                                     existing_meta = registry.get(widget_file_name, {}) if isinstance(registry, dict) else {}
                                 except Exception:
                                     existing_meta = {}
-                                # ✅ overwrite is only allowed for the original creator
+                        
                                 existing_created_by = (existing_meta.get("created_by", "") or "").strip().lower()
                                 can_overwrite_owner = (not existing_created_by) or (existing_created_by == created_by_user)
+                        
+                        # ✅ store results so the rest of the UI logic below can use them on reruns
+                        st.session_state["bt_file_exists"] = file_exists
+                        st.session_state["bt_existing_pages_url"] = existing_pages_url
+                        st.session_state["bt_existing_meta"] = existing_meta
+                        st.session_state["bt_can_overwrite_owner"] = can_overwrite_owner
+
+                        file_exists = st.session_state.get("bt_file_exists", False)
+                        existing_pages_url = st.session_state.get("bt_existing_pages_url", "")
+                        existing_meta = st.session_state.get("bt_existing_meta", {})
+                        can_overwrite_owner = st.session_state.get("bt_can_overwrite_owner", False)
 
                         embed_done = bool((st.session_state.get("bt_last_published_url") or "").strip())
                         
