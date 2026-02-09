@@ -4551,23 +4551,56 @@ if main_tab == "Create New Table":
 
                 # ✅ Render preview LAST (ONLY inside Create tab)
                 with preview_slot:
-                    live_cfg = draft_config_from_state()
-                    live_rules = st.session_state.get("bt_col_format_rules", {})
+                    # Optional (but recommended): don’t render preview unless user wants it
+                    st.session_state.setdefault("bt_show_preview", True)
+                    st.checkbox("Show live preview", key="bt_show_preview")
                 
-                    df_preview = st.session_state["bt_df_uploaded"].copy()
-                    hidden_cols = st.session_state.get("bt_hidden_cols", []) or []
-                    if hidden_cols:
-                        df_preview = df_preview.drop(columns=hidden_cols, errors="ignore")
-                        
-                    # ✅ NEW: limit preview rows
-                    PREVIEW_LIMIT = 100
-                    if len(df_preview) > PREVIEW_LIMIT:
-                        st.info(f"Preview limited to first {PREVIEW_LIMIT} rows for performance. Full table appears in the published page.")
-                        df_preview = df_preview.head(PREVIEW_LIMIT)
+                    if not st.session_state["bt_show_preview"]:
+                        st.info("Preview hidden for performance.")
+                    else:
+                        live_cfg = draft_config_from_state()
+                        live_rules = st.session_state.get("bt_col_format_rules", {})
                 
-                    live_preview_html = html_from_config(
-                        df_preview,
-                        live_cfg,
-                        col_format_rules=live_rules,
-                    )
-                    components.html(live_preview_html, height=820, scrolling=True)
+                        df_preview = st.session_state["bt_df_uploaded"].copy()
+                        hidden_cols = st.session_state.get("bt_hidden_cols", []) or []
+                        if hidden_cols:
+                            df_preview = df_preview.drop(columns=hidden_cols, errors="ignore")
+                
+                        # ✅ limit preview rows
+                        PREVIEW_LIMIT = 100
+                        if len(df_preview) > PREVIEW_LIMIT:
+                            st.info(
+                                f"Preview limited to first {PREVIEW_LIMIT} rows for performance. "
+                                f"Full table appears in the published page."
+                            )
+                            df_preview = df_preview.head(PREVIEW_LIMIT)
+                
+                        # ✅ Build a stable cache key for the preview
+                        # - config hash already exists in your app
+                        cfg_hash = stable_config_hash(live_cfg)
+                
+                        # - hash the preview dataframe content (fast + stable)
+                        #   (includes values + index; column order matters)
+                        try:
+                            df_hash = int(pd.util.hash_pandas_object(df_preview, index=True).sum())
+                        except Exception:
+                            # fallback: shape-based (less perfect, but prevents crashes)
+                            df_hash = hash((df_preview.shape, tuple(df_preview.columns)))
+                
+                        rules_hash = hash(json.dumps(live_rules, sort_keys=True, default=str))
+                        preview_key = f"{cfg_hash}|{df_hash}|{rules_hash}"
+                
+                        # ✅ Only rebuild HTML if key changed
+                        if st.session_state.get("bt_preview_key") != preview_key:
+                            st.session_state["bt_preview_key"] = preview_key
+                            st.session_state["bt_preview_html"] = html_from_config(
+                                df_preview,
+                                live_cfg,
+                                col_format_rules=live_rules,
+                            )
+                
+                        components.html(
+                            st.session_state.get("bt_preview_html", ""),
+                            height=820,
+                            scrolling=True,
+                        )
