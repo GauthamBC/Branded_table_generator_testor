@@ -1530,8 +1530,6 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       && !!embedWrap && !embedWrap.classList.contains('vi-hide')
       && !!downloadBtn && !!menu;
 
-    Array.from(tb.rows).forEach((r,i)=>{ if(!r.classList.contains('dw-empty')) r.dataset.idx=i; });
-
     let pageSize = hasPager ? (parseInt(sizeSel.value,10) || 10) : 0;
     let page = 1;
     let filter = '';
@@ -1645,43 +1643,59 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     }
 
     function renderPage(){
+      // Always operate on full dataset order (which sortBy updates in DOM order)
       const ordered = ALL_ROWS.slice();
       const visible = ordered.filter(matchesFilter);
       const total = visible.length;
-
-      ordered.forEach(r=>{ r.style.display='none'; });
+    
+      // hide all real rows first
+      ALL_ROWS.forEach(r => { r.style.display = 'none'; });
+    
       let shown = [];
-
-      if(total===0){
-        if(emptyRow){
-          emptyRow.style.display='table-row';
-          emptyRow.firstElementChild.colSpan = heads.length;
+      if (total === 0){
+        if (emptyRow){
+          emptyRow.style.display = 'table-row';
+          if (emptyRow.firstElementChild) emptyRow.firstElementChild.colSpan = heads.length;
         }
-        if(hasPager){ prevBtn.disabled = nextBtn.disabled = true; }
+        if (hasPager){
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
+        }
         setPageStatus(0, 0);
-      }else{
-        if(emptyRow) emptyRow.style.display='none';
-
-        if(!hasPager || pageSize===0){
-          shown = visible;
-          if(hasPager){ prevBtn.disabled = nextBtn.disabled = true; }
-          setPageStatus(total, 1);
-        }else{
-          const pages = Math.max(1, Math.ceil(total / pageSize));
-          page = Math.min(Math.max(1, page), pages);
-          const start = (page-1)*pageSize;
-          const end = start + pageSize;
-          shown = visible.slice(start,end);
-          prevBtn.disabled = page<=1;
-          nextBtn.disabled = page>=pages;
-          setPageStatus(total, pages);
-        }
+        applyVisibleZebra();
+        syncMenuOptions();
+        return;
       }
-
-      shown.forEach(r=>{ r.style.display='table-row'; });
-
-      scroller.scrollTop = 0;
+    
+      if (emptyRow) emptyRow.style.display = 'none';
+    
+      if (!hasPager || pageSize === 0){
+        // show all filtered rows
+        shown = visible;
+        shown.forEach(r => { r.style.display = 'table-row'; });
+        if (hasPager){
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
+        }
+        setPageStatus(total, 1);
+      } else {
+        const pages = Math.max(1, Math.ceil(total / pageSize));
+        if (page > pages) page = pages;
+        if (page < 1) page = 1;
+    
+        const start = (page - 1) * pageSize;
+        const end = start + pageSize;
+        shown = visible.slice(start, end);
+    
+        shown.forEach(r => { r.style.display = 'table-row'; });
+    
+        prevBtn.disabled = page <= 1;
+        nextBtn.disabled = page >= pages;
+        setPageStatus(total, pages);
+      }
+    
       applyVisibleZebra();
+      syncMenuOptions();
     }
 
     if(hasSearch){
