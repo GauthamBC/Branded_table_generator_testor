@@ -1718,26 +1718,26 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
     function hideMenu(){ if(menu) menu.classList.add('vi-hide'); }
     function toggleMenu(){ if(menu) menu.classList.toggle('vi-hide'); }
-    function runPngExport(mode){
+    async function runPngExport(mode){
       if (isExportingPng) return;
       isExportingPng = true;
     
-      // Optional: temporary disabled state
       if (btnTop10) btnTop10.disabled = true;
       if (btnBottom10) btnBottom10.disabled = true;
       if (btnImgCurrent) btnImgCurrent.disabled = true;
     
-      Promise.resolve()
-        .then(() => downloadDomPng(mode))
-        .catch(err => console.error('PNG export failed:', err))
-        .finally(() => {
-          isExportingPng = false;
-          if (btnTop10) btnTop10.disabled = false;
-          if (btnBottom10) btnBottom10.disabled = false;
-          if (btnImgCurrent) btnImgCurrent.disabled = false;
-        });
+      try{
+        await downloadDomPng(mode);
+        await new Promise(r => setTimeout(r, 180)); // tiny cooldown
+      }catch(err){
+        console.error('PNG export failed:', err);
+      }finally{
+        isExportingPng = false;
+        if (btnTop10) btnTop10.disabled = false;
+        if (btnBottom10) btnBottom10.disabled = false;
+        if (btnImgCurrent) btnImgCurrent.disabled = false;
+      }
     }
-
     document.addEventListener('click', (e)=>{
       if(!menu || menu.classList.contains('vi-hide')) return;
       const inMenu = menu.contains(e.target);
@@ -1884,7 +1884,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
     async function captureCloneToPng(clone, stage, filename, targetWidth){
       const cloneScroller = clone.querySelector('.dw-scroll');
-
+    
       if(cloneScroller){
         cloneScroller.style.maxHeight = 'none';
         cloneScroller.style.height = 'auto';
@@ -1893,38 +1893,35 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         cloneScroller.style.overflowY = 'visible';
         cloneScroller.classList.add('no-scroll');
       }
-
-      // ✅ export width = full table scroll width (not viewport width)
-    const w = Math.max(900, Math.ceil(targetWidth || 1200));
-    clone.style.maxWidth = "none";
-    clone.style.width = w + "px";
     
-    // ✅ ensure the table itself isn't constrained by parent width
-    const cloneTable = clone.querySelector("table.dw-table");
-    if(cloneTable){
-      cloneTable.style.width = "max-content";
-      cloneTable.style.minWidth = "100%";
-    }
-
+      const w = Math.max(900, Math.ceil(targetWidth || 1200));
+      clone.style.maxWidth = "none";
+      clone.style.width = w + "px";
+    
+      const cloneTable = clone.querySelector("table.dw-table");
+      if(cloneTable){
+        cloneTable.style.width = "max-content";
+        cloneTable.style.minWidth = "100%";
+      }
+    
       await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
       await waitForFontsAndImages(clone);
-
+    
       const fullH = Math.ceil(Math.max(
         clone.scrollHeight || 0,
         clone.offsetHeight || 0,
         clone.getBoundingClientRect().height || 0
       ));
-
+    
       const MAX_CAPTURE_AREA = 28_000_000;
       const area = Math.ceil(w) * Math.ceil(fullH);
       if(area > MAX_CAPTURE_AREA){
         stage.remove();
-        console.warn("PNG export skipped: capture area too large.", { w, fullH, area });
-        return;
+        throw new Error("PNG export skipped: capture area too large.");
       }
-
+    
       const scale = Math.min(3, Math.max(2, window.devicePixelRatio || 2));
-
+    
       const canvas = await window.html2canvas(clone, {
         backgroundColor: '#ffffff',
         scale,
@@ -1938,23 +1935,27 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         scrollX: 0,
         scrollY: 0,
       });
-
-      canvas.toBlob((blob)=>{
-        if(!blob){
-          stage.remove();
-          console.warn("PNG export failed: no blob returned.");
-          return;
-        }
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename + '.png';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(()=>URL.revokeObjectURL(url), 1500);
-        stage.remove();
-      }, 'image/png');
+    
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (!b) return reject(new Error("PNG export failed: no blob returned."));
+          resolve(b);
+        }, 'image/png');
+      });
+    
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      stage.remove();
+    
+      // small cooldown so immediate next export works reliably
+      await new Promise(r => setTimeout(r, 220));
     }
 
     async function downloadDomPng(mode){
