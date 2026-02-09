@@ -1629,6 +1629,16 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       pageStatus.textContent = "Page " + page + " Of " + pages;
     }
 
+    function applyVisibleZebra() {
+      const rows = Array.from(tb.rows)
+        .filter(tr => !tr.classList.contains('dw-empty') && tr.style.display !== 'none');
+    
+      rows.forEach((tr, i) => {
+        tr.classList.remove('dw-zebra-even', 'dw-zebra-odd');
+        tr.classList.add(i % 2 === 0 ? 'dw-zebra-odd' : 'dw-zebra-even');
+      });
+    }
+
     function renderPage(){
       const ordered = Array.from(tb.rows).filter(r=>!r.classList.contains('dw-empty'));
       const visible = ordered.filter(matchesFilter);
@@ -1666,6 +1676,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       shown.forEach(r=>{ r.style.display='table-row'; });
 
       scroller.scrollTop = 0;
+      applyVisibleZebra();
     }
 
     if(hasSearch){
@@ -2599,14 +2610,15 @@ def generate_table_html_from_df(
     colspan = str(len(df.columns))
 
     stripe_css = (
-        """
-    #bt-block tbody tr:not(.dw-empty):nth-child(odd) td{background:var(--stripe);}
-    #bt-block tbody tr:not(.dw-empty):nth-child(even) td{background:#ffffff;}
-"""
+    """
+    #bt-block tbody tr:not(.dw-empty) td{ background:#ffffff; } /* base */
+    #bt-block tbody tr.dw-zebra-odd  td{ background:var(--stripe); } /* striped */
+    #bt-block tbody tr.dw-zebra-even td{ background:#ffffff; }       /* plain */
+    """
         if striped
         else """
     #bt-block tbody tr:not(.dw-empty) td{background:#ffffff;}
-"""
+    """
     )
 
     header_class = "centered" if center_titles else ""
