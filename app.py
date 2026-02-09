@@ -3730,22 +3730,75 @@ if main_tab == "Create New Table":
         
                 ensure_confirm_state_exists()
 
-# ===================== Top: Primary Tabs (2 full-width buttons) =====================
-st.session_state.setdefault("bt_left_view", "Edit table contents")
+# ===================== Top: Primary Tabs (tab look, radio behavior) =====================
+st.markdown(
+    """
+    <style>
+      /* ✅ FORCE segmented_control to truly span full width (Streamlit + BaseWeb layers) */
+      div[data-testid="stSegmentedControl"]{
+        width: 100% !important;
+      }
+      div[data-testid="stSegmentedControl"] > div{
+        width: 100% !important;
+        max-width: none !important;
+      }
 
-c1, c2 = st.columns(2, gap="small")
+      /* BaseWeb segmented control wrapper */
+      div[data-testid="stSegmentedControl"] div[data-baseweb="segmented-control"]{
+        width: 100% !important;
+        max-width: none !important;
+        display: flex !important;
+      }
+      div[data-testid="stSegmentedControl"] div[data-baseweb="segmented-control"] > div{
+        width: 100% !important;
+        max-width: none !important;
+        display: flex !important;
+      }
 
-with c1:
-    if st.button("Edit table contents", use_container_width=True, type="secondary"):
-        st.session_state["bt_left_view"] = "Edit table contents"
-        st.rerun()
+      /* The actual button row */
+      div[data-testid="stSegmentedControl"] div[role="radiogroup"],
+      div[data-testid="stSegmentedControl"] div[role="group"]{
+        width: 100% !important;
+        max-width: none !important;
+        display: flex !important;
+      }
 
-with c2:
-    if st.button("Get Embed Script", use_container_width=True, type="secondary"):
-        st.session_state["bt_left_view"] = "Get Embed Script"
-        st.rerun()
+      /* Buttons: 50/50, fill row */
+      div[data-testid="stSegmentedControl"] button{
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+        width: 50% !important;
+        justify-content: center !important;
+        text-align: center !important;
+      }
 
-left_view = st.session_state["bt_left_view"]
+      /* Fallback radio (if segmented_control isn't available) – keep it 50/50 */
+      div[data-testid="stRadio"]{
+        width: 100% !important;
+      }
+      div[data-testid="stRadio"] > div{
+        width: 100% !important;
+      }
+      div[data-testid="stRadio"] div[role="radiogroup"]{
+        display: flex !important;
+        width: 100% !important;
+      }
+      div[data-testid="stRadio"] label{
+        flex: 1 1 0% !important;
+        justify-content: center !important;
+        text-align: center !important;
+        margin-right: 0 !important;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+left_view = tab_switch(
+    "Left view",
+    ["Edit table contents", "Get Embed Script"],
+    key="bt_left_view",
+    default="Edit table contents",
+)
 
 st.divider()
 
