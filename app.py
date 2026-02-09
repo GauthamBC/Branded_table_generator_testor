@@ -5,6 +5,7 @@ import html as html_mod
 import json
 import re
 import time
+import requests
 import io
 import json
 from collections.abc import Mapping
@@ -1480,6 +1481,10 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
     const table = root.querySelector('table.dw-table');
     const tb = table ? table.tBodies[0] : null;
+    const ALL_ROWS = tb ? Array.from(tb.rows).filter(r => !r.classList.contains('dw-empty')) : [];
+    const PREVIEW_LIMIT = 100;
+    const PREVIEW_ROWS = ALL_ROWS.slice(0, PREVIEW_LIMIT);
+    ALL_ROWS.forEach((r, i) => { r.dataset.idx = String(i); });
     const scroller = root.querySelector('.dw-scroll');
     const controls = root.querySelector('.dw-controls');
     if(!table || !tb || !scroller || !controls) return;
@@ -1640,7 +1645,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     }
 
     function renderPage(){
-      const ordered = Array.from(tb.rows).filter(r=>!r.classList.contains('dw-empty'));
+      const ordered = ALL_ROWS.slice();
       const visible = ordered.filter(matchesFilter);
       const total = visible.length;
 
@@ -1772,7 +1777,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         const headsText = heads.map(th => escapeCsvCell(th.innerText || th.textContent || ""));
         const headerLine = headsText.join(",");
 
-        const ordered = Array.from(tb.rows).filter(r => !r.classList.contains("dw-empty"));
+        const ordered = PREVIEW_ROWS.slice();
         const filteredRows = ordered.filter(matchesFilter);
 
         const lines = [headerLine];
@@ -1836,40 +1841,41 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       if (!cloneTb) return;
     
       const cloneRows = Array.from(cloneTb.rows).filter(r => !r.classList.contains('dw-empty'));
-      const liveRows  = Array.from(tb.rows).filter(r => !r.classList.contains('dw-empty'));
+    
+      // Map clone rows by original data idx
+      const cloneByIdx = new Map();
+      cloneRows.forEach(r => cloneByIdx.set(String(r.dataset.idx), r));
     
       const keep = new Set();
     
-      // Full dataset order (stable by original idx)
-      const allIdxAsc = liveRows
+      // Full dataset order by original index
+      const allIdxAsc = ALL_ROWS
         .map(r => Number(r.dataset.idx))
         .filter(n => Number.isFinite(n))
-        .sort((a,b) => a - b);
+        .sort((a, b) => a - b);
     
-      if (mode === 'current'){
-        // current visible rows only (filter + paging)
-        liveRows.forEach(lr => {
-          if (lr.style.display !== 'none') keep.add(String(lr.dataset.idx));
-        });
-    
-      } else if (mode === 'top10'){
+      if (mode === 'top10'){
         allIdxAsc.slice(0, 10).forEach(i => keep.add(String(i)));
-    
       } else if (mode === 'bottom10'){
-        allIdxAsc.slice(-10).forEach(i => keep.add(String(i)));
-    
+        allIdxAsc.slice(-10).forEach(i => keep.add(String(i))); // true bottom 10 from full dataset
+      } else if (mode === 'current'){
+        // only what is currently visible in preview
+        PREVIEW_ROWS.forEach(r => {
+          if (r.style.display !== 'none') keep.add(String(r.dataset.idx));
+        });
       } else {
-        allIdxAsc.forEach(i => keep.add(String(i)));
+        // fallback: show all preview rows
+        PREVIEW_ROWS.forEach(r => keep.add(String(r.dataset.idx)));
       }
     
-      // Apply visibility to clone by idx
+      // Show/hide clone rows by idx
       cloneRows.forEach(r => {
         const on = keep.has(String(r.dataset.idx));
         r.style.display = on ? 'table-row' : 'none';
         r.classList.remove('dw-zebra-odd', 'dw-zebra-even');
       });
     
-      // Re-zebra in visible order
+      // Re-zebra visible rows
       const vis = cloneRows.filter(r => r.style.display !== 'none');
       vis.forEach((r, i) => {
         r.classList.add(i % 2 === 0 ? 'dw-zebra-odd' : 'dw-zebra-even');
