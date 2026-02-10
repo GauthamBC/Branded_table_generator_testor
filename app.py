@@ -1098,9 +1098,23 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       vertical-align:middle;
       border:0;
       padding:14px 14px;
-      white-space:nowrap;
       transition:background-color .15s, color .15s, box-shadow .15s, transform .05s;
-      text-align: var(--cell-align, center);  /* ✅ ADD THIS */
+      text-align: var(--cell-align, center);
+    
+      /* ✅ 3-line clamp in LIVE table */
+      white-space: normal;
+      overflow-wrap: normal;   /* no mid-word split */
+      word-break: normal;      /* no agricul / ture */
+      hyphens: none;
+      line-height: 1.15;
+    
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+    
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     #bt-block thead th.sortable{cursor:pointer; user-select:none}
     #bt-block thead th.sortable::after{content:"↕"; font-size:12px; opacity:.75; margin-left:8px; color:#ffffff}
@@ -1128,7 +1142,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       line-height: 1.35;
     
       /* keep words intact (no agricul + ture split) */
-      overflow-wrap: break-word;   /* wraps only if needed */
+      overflow-wrap: normal;
       word-break: normal;          /* don't break inside words */
       hyphens: none;               /* no auto hyphen splits */
     
