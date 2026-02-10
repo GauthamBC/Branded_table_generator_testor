@@ -1101,50 +1101,72 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       transition:background-color .15s, color .15s, box-shadow .15s, transform .05s;
       text-align: var(--cell-align, center);
     
-      /* ✅ 3-line clamp in LIVE table */
+      /* keep table layout stable */
       white-space: normal;
-      overflow-wrap: normal;   /* no mid-word split */
-      word-break: normal;      /* no agricul / ture */
+      overflow-wrap: normal;
+      word-break: normal;
       hyphens: none;
       line-height: 1.15;
     
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 3;
-      line-clamp: 3;
-    
+      /* IMPORTANT: do NOT change table-cell display */
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    
     #bt-block thead th.sortable{cursor:pointer; user-select:none}
     #bt-block thead th.sortable::after{content:"↕"; font-size:12px; opacity:.75; margin-left:8px; color:#ffffff}
     #bt-block thead th.sortable[data-sort="asc"]::after{content:"▲"}
     #bt-block thead th.sortable[data-sort="desc"]::after{content:"▼"}
-    #bt-block thead th.sortable:hover,#bt-block thead th.sortable:focus-visible{background:var(--brand-600); color:#fff; box-shadow:inset 0 -3px 0 var(--brand-100)}
-    #bt-block .dw-scroll.scrolled thead th{box-shadow:0 6px 10px -6px rgba(0,0,0,.25)}
-    #bt-block thead th.is-sorted{background:var(--brand-700); color:#fff; box-shadow:inset 0 -3px 0 var(--brand-100)}
-
+    
+    /* 3-line clamp for sortable header labels without breaking <th> layout */
+    #bt-block thead th.sortable > .dw-th-label{
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    #bt-block thead th.sortable:hover,
+    #bt-block thead th.sortable:focus-visible{
+      background:var(--brand-600);
+      color:#fff;
+      box-shadow:inset 0 -3px 0 var(--brand-100);
+    }
+    
+    #bt-block .dw-scroll.scrolled thead th{
+      box-shadow:0 6px 10px -6px rgba(0,0,0,.25);
+    }
+    
+    #bt-block thead th.is-sorted{
+      background:var(--brand-700);
+      color:#fff;
+      box-shadow:inset 0 -3px 0 var(--brand-100);
+    }
+    
+    /* shared cell spacing/alignment */
     #bt-block thead th,
     #bt-block tbody td {
       padding: 16px 14px;
-      overflow: hidden;
       text-align: var(--cell-align, center);
       vertical-align: middle;
     }
-
+    
     /* Heatmap cells (overlay sits on top of zebra background) */
     #bt-block td.dw-heat-td{
       background-clip: padding-box;
     }
-
+    
+    /* body cell text clamp to max 3 lines */
     #bt-block .dw-cell{
       white-space: normal;
       line-height: 1.35;
     
       /* keep words intact (no agricul + ture split) */
       overflow-wrap: normal;
-      word-break: normal;          /* don't break inside words */
-      hyphens: none;               /* no auto hyphen splits */
+      word-break: normal;
+      hyphens: none;
     
       /* max 3 lines */
       display: -webkit-box;
@@ -1155,7 +1177,6 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       overflow: hidden;
       text-overflow: ellipsis;
     }
-
     /* ======================================================
        ✅ FIXED BAR TRACK WIDTH + AUTO COLUMN EXPAND
        ====================================================== */
@@ -1588,6 +1609,18 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     scroller.addEventListener('scroll', onScrollShadow); onScrollShadow();
 
     const heads = Array.from(table.tHead.rows[0].cells);
+    // Wrap header text in span for safe 3-line clamp (without breaking table layout)
+    heads.forEach((th) => {
+      if (th.querySelector('.dw-th-label')) return;
+    
+      const txt = (th.textContent || '').trim();
+      th.textContent = '';
+    
+      const span = document.createElement('span');
+      span.className = 'dw-th-label';
+      span.textContent = txt;
+      th.appendChild(span);
+    });
     heads.forEach((th,i)=>{
       th.classList.add('sortable'); th.setAttribute('aria-sort','none'); th.dataset.sort='none'; th.tabIndex=0;
       const type = th.dataset.type || 'text';
