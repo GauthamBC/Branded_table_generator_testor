@@ -1120,12 +1120,14 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     
     /* 3-line clamp for sortable header labels without breaking <th> layout */
     #bt-block thead th.sortable > .dw-th-label{
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 3;
-      line-clamp: 3;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      display: block;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      word-break: normal;
+      overflow-wrap: normal;
+      hyphens: none;
+      line-height: 1.15;
     }
     
     #bt-block thead th.sortable:hover,
