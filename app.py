@@ -1079,14 +1079,14 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     #bt-block .dw-scroll::-webkit-scrollbar-thumb:hover{ background: var(--brand-600); }
 
     #bt-block table.dw-table {
-      width: 100%;
+      width: max-content;   /* allow columns to grow so headers can fit */
+      min-width: 100%;      /* still fill container at minimum */
       border-collapse: separate;
       border-spacing: 0;
       font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
       color: var(--text);
       font-variant-numeric: tabular-nums;
       background: transparent;
-      min-width: 600px;
       table-layout: auto;
     }
 
@@ -1120,14 +1120,18 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     
     /* 3-line clamp for sortable header labels without breaking <th> layout */
     #bt-block thead th.sortable > .dw-th-label{
-      display: block;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    
       white-space: normal;
-      overflow: visible;
-      text-overflow: clip;
       word-break: normal;
       overflow-wrap: normal;
       hyphens: none;
-      line-height: 1.15;
+      line-height: 1.2;
     }
     
     #bt-block thead th.sortable:hover,
