@@ -1125,16 +1125,21 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
     #bt-block .dw-cell{
       white-space: normal;
-      overflow-wrap: normal;
-      word-break: normal;
       line-height: 1.35;
-
-      display:-webkit-box;
-      -webkit-line-clamp:2;
-      -webkit-box-orient:vertical;
-
-      overflow:hidden;
-      text-overflow:ellipsis;
+    
+      /* keep words intact (no agricul + ture split) */
+      overflow-wrap: break-word;   /* wraps only if needed */
+      word-break: normal;          /* don't break inside words */
+      hyphens: none;               /* no auto hyphen splits */
+    
+      /* max 3 lines */
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+    
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* ======================================================
@@ -2040,19 +2045,28 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
             line-height: 1.15 !important;
             padding-top: 10px !important;
             padding-bottom: 10px !important;
-            overflow-wrap: anywhere !important;
-            word-break: break-word !important;
-            hyphens: auto !important;
+            overflow-wrap: normal !important;
+            word-break: normal !important;
+            hyphens: none !important;
           }
         
-          /* ✅ Remove the 2-line clamp / ellipsis in export */
-          .vi-table-embed.export-mode #bt-block .dw-cell{
-            display: block !important;
-            -webkit-line-clamp: unset !important;
-            -webkit-box-orient: unset !important;
-            overflow: visible !important;
-            white-space: normal !important;
-          }
+          /* ✅ Keep SAME 3-line clamp behavior in export (match interactive table) */
+        .vi-table-embed.export-mode #bt-block .dw-cell{
+          white-space: normal !important;
+          word-break: normal !important;      /* no mid-word split */
+          overflow-wrap: normal !important;   /* wrap only at normal word boundaries */
+          hyphens: none !important;
+        
+          line-height: 1.35 !important;
+        
+          display: -webkit-box !important;
+          -webkit-box-orient: vertical !important;
+          -webkit-line-clamp: 3 !important;
+          line-clamp: 3 !important;
+        
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+        }
         
           /* ✅ Export should never compress the bar columns */
           .vi-table-embed.export-mode #bt-block th.dw-bar-col,
