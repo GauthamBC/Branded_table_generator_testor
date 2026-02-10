@@ -2025,30 +2025,38 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
             min-width: 100% !important;
           }
         
-          /* ✅ No clipping in header/cells */
-          .vi-table-embed.export-mode #bt-block thead th,
-          .vi-table-embed.export-mode #bt-block tbody td{
-            overflow: visible !important;
-            text-overflow: clip !important;
-          }
+         /* keep cell-level clamp rules in control */
+        .vi-table-embed.export-mode #bt-block thead th,
+        .vi-table-embed.export-mode #bt-block tbody td{
+          vertical-align: top !important;
+        }
         
           /* ✅ REMOVE SORT ARROWS IN EXPORT MODE */
           .vi-table-embed.export-mode #bt-block thead th.sortable::after{
             content: "" !important;
           }
         
-          /* ✅ Header wrapping in export */
-          .vi-table-embed.export-mode #bt-block thead th{
-            white-space: normal !important;
-            overflow: visible !important;
-            text-overflow: clip !important;
-            line-height: 1.15 !important;
-            padding-top: 10px !important;
-            padding-bottom: 10px !important;
-            overflow-wrap: normal !important;
-            word-break: normal !important;
-            hyphens: none !important;
-          }
+          /* ✅ Header: same 3-line limit behavior in export */
+        .vi-table-embed.export-mode #bt-block thead th{
+          white-space: normal !important;
+          line-height: 1.15 !important;
+          padding-top: 10px !important;
+          padding-bottom: 10px !important;
+        
+          /* no mid-word splitting */
+          overflow-wrap: normal !important;
+          word-break: normal !important;
+          hyphens: none !important;
+        
+          /* clamp to max 3 lines */
+          display: -webkit-box !important;
+          -webkit-box-orient: vertical !important;
+          -webkit-line-clamp: 3 !important;
+          line-clamp: 3 !important;
+        
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+        }
         
           /* ✅ Keep SAME 3-line clamp behavior in export (match interactive table) */
         .vi-table-embed.export-mode #bt-block .dw-cell{
