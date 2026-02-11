@@ -1109,8 +1109,8 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       line-height: 1.15;
     
       /* IMPORTANT: do NOT change table-cell display */
-      overflow: hidden;
-      text-overflow: ellipsis;
+      overflow: visible;
+      text-overflow: clip;
     }
     
     #bt-block thead th.sortable{cursor:pointer; user-select:none}
@@ -1120,20 +1120,16 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     
     /* 3-line clamp for sortable header labels without breaking <th> layout */
     #bt-block thead th.sortable > .dw-th-label{
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 3;
-      line-clamp: 3;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    
+      display: block;
       white-space: normal;
       word-break: normal;
       overflow-wrap: normal;
       hyphens: none;
       line-height: 1.2;
+      overflow: visible;
+      text-overflow: clip;
     }
-    
+        
     #bt-block thead th.sortable:hover,
     #bt-block thead th.sortable:focus-visible{
       background:var(--brand-600);
@@ -1166,22 +1162,14 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     
     /* body cell text clamp to max 3 lines */
     #bt-block .dw-cell{
+      display: block;
       white-space: normal;
       line-height: 1.35;
-    
-      /* keep words intact (no agricul + ture split) */
       overflow-wrap: normal;
       word-break: normal;
       hyphens: none;
-    
-      /* max 3 lines */
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 3;
-      line-clamp: 3;
-    
-      overflow: hidden;
-      text-overflow: ellipsis;
+      overflow: visible;
+      text-overflow: clip;
     }
     /* ======================================================
        ✅ FIXED BAR TRACK WIDTH + AUTO COLUMN EXPAND
