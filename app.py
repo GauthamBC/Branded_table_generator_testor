@@ -2984,10 +2984,27 @@ def load_bundle_into_editor(owner: str, repo: str, token: str, widget_file_name:
 
     st.session_state["bt_table_name_words"] = bundle.get("table_name_words", "")
 
-    # Core config restore with safe defaults
-    st.session_state["brand_table"]            = cfg.get("brand", st.session_state.get("brand_table", "Action Network"))
-    st.session_state["bt_widget_title"]        = cfg.get("title", bundle.get("widget_title", "Table 1"))
-    st.session_state["bt_widget_subtitle"]     = cfg.get("subtitle", bundle.get("widget_subtitle", "Subheading"))
+    def _pick(*vals, default=None):
+        for v in vals:
+            if v is None:
+                continue
+            if isinstance(v, str):
+                if v.strip() != "":
+                    return v
+            else:
+                return v
+        return default
+
+    # Core config restore with safe defaults (supports legacy key variants)
+    st.session_state["brand_table"]            = _pick(
+        cfg.get("brand"), bundle.get("brand"), st.session_state.get("brand_table"), default="Action Network"
+    )
+    st.session_state["bt_widget_title"]        = _pick(
+        cfg.get("title"), cfg.get("table_title"), bundle.get("widget_title"), bundle.get("table_title"), default="Table 1"
+    )
+    st.session_state["bt_widget_subtitle"]     = _pick(
+        cfg.get("subtitle"), cfg.get("table_subtitle"), bundle.get("widget_subtitle"), bundle.get("table_subtitle"), default="Subheading"
+    )
 
     st.session_state["bt_show_header"]         = cfg.get("show_header", True)
     st.session_state["bt_center_titles"]       = cfg.get("center_titles", False)
