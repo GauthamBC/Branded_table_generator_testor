@@ -2957,6 +2957,8 @@ def load_bundle_into_editor(owner: str, repo: str, token: str, widget_file_name:
         return
 
     st.session_state["bt_uploaded_name"] = f"bundle:{widget_file_name}"
+    st.session_state["bt_editing_from_bundle"] = True
+    st.session_state["bt_active_bundle_name"] = widget_file_name
 
     created_by = (bundle.get("created_by", "") or "").strip().lower()
     st.session_state["bt_created_by_user"] = created_by
@@ -3915,6 +3917,10 @@ if main_tab == "Create New Table":
     if created_by_input_global and created_by_input_global != "Select a user...":
         created_by_user_global = created_by_input_global.strip().lower()
 
+    # In edit-from-bundle mode, keep existing created_by when dropdown is placeholder
+    if st.session_state.get("bt_editing_from_bundle", False) and not created_by_user_global:
+        created_by_user_global = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
+
     # store globally (used later in Publish tab)
     st.session_state["bt_created_by_user"] = created_by_user_global
 
@@ -3924,10 +3930,10 @@ if main_tab == "Create New Table":
     uploaded_file = st.file_uploader(
         "Upload Your CSV File",
         type=["csv"],
-        disabled=not bool(created_by_user_global),
+        disabled=(not bool(created_by_user_global) and not st.session_state.get("bt_editing_from_bundle", False)),
     )
 
-    if not created_by_user_global:
+    if (not created_by_user_global) and (not st.session_state.get("bt_editing_from_bundle", False)):
         st.info("Select **Created by** to enable CSV upload.")
     else:
         # =========================================================
@@ -3965,6 +3971,9 @@ if main_tab == "Create New Table":
         else:
             # ✅ Source of data: upload wins, otherwise use loaded bundle df
             if uploaded_file is not None:
+                # New upload takes precedence over edit-bundle mode
+                st.session_state["bt_editing_from_bundle"] = False
+                st.session_state.pop("bt_active_bundle_name", None)
                 try:
                     df_uploaded_now = pd.read_csv(uploaded_file)
                 except Exception as e:
