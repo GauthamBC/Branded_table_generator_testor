@@ -1097,7 +1097,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       font-weight:700;
       vertical-align:middle;
       border:0;
-      padding:14px 14px;
+      padding: 10px 14px;
       transition:background-color .15s, color .15s, box-shadow .15s, transform .05s;
       text-align: var(--cell-align, center);
     
@@ -1114,20 +1114,29 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     }
     
     #bt-block thead th.sortable{cursor:pointer; user-select:none}
-    #bt-block thead th.sortable::after{content:"↕"; font-size:12px; opacity:.75; margin-left:8px; color:#ffffff}
+    #bt-block thead th.sortable::after{
+      content:"↕";
+      display:inline-block;
+      font-size:12px;
+      line-height:1;
+      opacity:.85;
+      margin-left:8px;
+      color:#ffffff;
+      vertical-align:middle;
+    }
     #bt-block thead th.sortable[data-sort="asc"]::after{content:"▲"}
     #bt-block thead th.sortable[data-sort="desc"]::after{content:"▼"}
     
     /* 3-line clamp for sortable header labels without breaking <th> layout */
     #bt-block thead th.sortable > .dw-th-label{
-      display: block;
-      white-space: normal;
-      word-break: normal;
-      overflow-wrap: normal;
-      hyphens: none;
-      line-height: 1.2;
-      overflow: visible;
-      text-overflow: clip;
+      display:inline;
+      white-space:nowrap;
+      overflow:visible;
+      text-overflow:clip;
+      word-break:normal;
+      overflow-wrap:normal;
+      hyphens:none;
+      line-height:1.15;
     }
         
     #bt-block thead th.sortable:hover,
