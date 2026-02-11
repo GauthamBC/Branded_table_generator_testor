@@ -1057,7 +1057,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
     /* scroll */
     #bt-block .dw-scroll{
-      max-height: min(var(--table-max-h, 680px), calc(100vh - 240px));
+      max-height: var(--table-max-h, 680px);  /* fixed inner table height */
       overflow: auto;
       -webkit-overflow-scrolling: touch;
       touch-action: pan-x pan-y;
