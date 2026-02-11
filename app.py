@@ -2951,9 +2951,29 @@ def build_publish_bundle(widget_file_name: str) -> dict:
 def load_bundle_into_editor(owner: str, repo: str, token: str, widget_file_name: str):
     bundle_path = f"bundles/{widget_file_name}.json"
     bundle = read_github_json(owner, repo, token, bundle_path, branch="main")
-    st.session_state["bt_uploaded_name"] = f"bundle:{widget_file_name}"   # ✅ makes Create tab treat it like a "loaded file"
-    st.session_state["bt_created_by_user"] = (bundle.get("created_by","") or "").strip().lower()
-    st.session_state["bt_created_by_user_select_create"] = st.session_state["bt_created_by_user"] or "Select a user..."
+
+    if not isinstance(bundle, dict) or not bundle:
+        st.error(f"Bundle not found at {bundle_path}. Cannot restore full table settings.")
+        return
+
+    st.session_state["bt_uploaded_name"] = f"bundle:{widget_file_name}"
+
+    created_by = (bundle.get("created_by", "") or "").strip().lower()
+    st.session_state["bt_created_by_user"] = created_by
+    st.session_state["bt_created_by_user_select"] = created_by or "Select a user..."
+
+    cfg = bundle.get("config") or {}
+
+    # Clear editor keys to avoid stale mixes
+    for k in [
+        "bt_show_header","bt_widget_title","bt_widget_subtitle","bt_center_titles","bt_branded_title_color",
+        "bt_show_footer","bt_footer_logo_align","bt_footer_logo_h","bt_show_footer_notes","bt_footer_notes","bt_show_heat_scale",
+        "bt_striped_rows","bt_cell_align","bt_show_search","bt_show_pager","bt_show_embed","bt_show_page_numbers",
+        "bt_bar_columns","bt_bar_max_overrides","bt_bar_fixed_w",
+        "bt_heat_columns","bt_heat_overrides","bt_heat_strength","bt_heatmap_style","bt_header_style",
+        "bt_col_format_rules","bt_hidden_cols"
+    ]:
+        st.session_state.pop(k, None)
 
     csv_text = (bundle.get("csv") or "")
     if csv_text.strip():
@@ -2962,61 +2982,57 @@ def load_bundle_into_editor(owner: str, repo: str, token: str, widget_file_name:
         st.session_state["bt_df_source"] = df.copy(deep=True)
         st.session_state["bt_df_confirmed"] = df.copy(deep=True)
 
-    # restore core editor fields
     st.session_state["bt_table_name_words"] = bundle.get("table_name_words", "")
-    st.session_state["bt_widget_title"] = bundle.get("widget_title", "")
-    st.session_state["bt_widget_subtitle"] = bundle.get("widget_subtitle", "")
 
-    # restore toggles/rules
-    st.session_state["bt_col_format_rules"] = bundle.get("col_format_rules", {}) or {}
-    st.session_state["bt_hidden_cols"] = bundle.get("hidden_cols", []) or []
-    st.session_state["bt_bar_columns"] = bundle.get("bar_columns", []) or []
-    st.session_state["bt_bar_max_overrides"] = bundle.get("bar_max_overrides", {}) or {}
-    st.session_state["bt_heat_columns"] = bundle.get("heat_columns", []) or []
-    st.session_state["bt_heat_overrides"] = bundle.get("heat_overrides", {}) or {}
+    # Core config restore with safe defaults
+    st.session_state["brand_table"]            = cfg.get("brand", st.session_state.get("brand_table", "Action Network"))
+    st.session_state["bt_widget_title"]        = cfg.get("title", bundle.get("widget_title", "Table 1"))
+    st.session_state["bt_widget_subtitle"]     = cfg.get("subtitle", bundle.get("widget_subtitle", "Subheading"))
 
-    # restore config (mapped to editor session keys)
-    cfg = bundle.get("config") or {}
-    
-    CFG_TO_STATE = {
-        "brand": "brand_table",
-        "title": "bt_widget_title",
-        "subtitle": "bt_widget_subtitle",
-        "striped": "bt_striped_rows",
-        "show_header": "bt_show_header",
-        "center_titles": "bt_center_titles",
-        "branded_title_color": "bt_branded_title_color",
-        "show_footer": "bt_show_footer",
-        "footer_logo_align": "bt_footer_logo_align",
-        "footer_logo_h": "bt_footer_logo_h",
-        "show_footer_notes": "bt_show_footer_notes",
-        "footer_notes": "bt_footer_notes",
-        "show_heat_scale": "bt_show_heat_scale",
-        "cell_align": "bt_cell_align",
-        "show_search": "bt_show_search",
-        "show_pager": "bt_show_pager",
-        "show_embed": "bt_show_embed",
-        "show_page_numbers": "bt_show_page_numbers",
-        "bar_columns": "bt_bar_columns",
-        "bar_max_overrides": "bt_bar_max_overrides",
-        "bar_fixed_w": "bt_bar_fixed_w",
-        "heat_columns": "bt_heat_columns",
-        "heat_overrides": "bt_heat_overrides",
-        "heat_strength": "bt_heat_strength",
-        "heatmap_style": "bt_heatmap_style",
-        "header_style": "bt_header_style",
-    }
-    
-    for cfg_key, state_key in CFG_TO_STATE.items():
-        if cfg_key in cfg:
-            st.session_state[state_key] = cfg[cfg_key]
+    st.session_state["bt_show_header"]         = cfg.get("show_header", True)
+    st.session_state["bt_center_titles"]       = cfg.get("center_titles", False)
+    st.session_state["bt_branded_title_color"] = cfg.get("branded_title_color", True)
 
-    # force user back to editor UX
+    st.session_state["bt_show_footer"]         = cfg.get("show_footer", True)
+    st.session_state["bt_footer_logo_align"]   = cfg.get("footer_logo_align", "Center")
+    st.session_state["bt_footer_logo_h"]       = int(cfg.get("footer_logo_h", 36) or 36)
+    st.session_state["bt_show_footer_notes"]   = cfg.get("show_footer_notes", False)
+    st.session_state["bt_footer_notes"]        = cfg.get("footer_notes", "")
+    st.session_state["bt_show_heat_scale"]     = cfg.get("show_heat_scale", False)
+
+    st.session_state["bt_striped_rows"]        = cfg.get("striped", True)
+    st.session_state["bt_cell_align"]          = cfg.get("cell_align", "Center")
+    st.session_state["bt_show_search"]         = cfg.get("show_search", True)
+    st.session_state["bt_show_pager"]          = cfg.get("show_pager", True)
+    st.session_state["bt_show_embed"]          = cfg.get("show_embed", True)
+    st.session_state["bt_show_page_numbers"]   = cfg.get("show_page_numbers", True)
+
+    st.session_state["bt_bar_columns"]         = cfg.get("bar_columns", bundle.get("bar_columns", [])) or []
+    st.session_state["bt_bar_max_overrides"]   = cfg.get("bar_max_overrides", bundle.get("bar_max_overrides", {})) or {}
+    st.session_state["bt_bar_fixed_w"]         = int(cfg.get("bar_fixed_w", 200) or 200)
+
+    st.session_state["bt_heat_columns"]        = cfg.get("heat_columns", bundle.get("heat_columns", [])) or []
+    st.session_state["bt_heat_overrides"]      = cfg.get("heat_overrides", bundle.get("heat_overrides", {})) or {}
+    st.session_state["bt_heat_strength"]       = float(cfg.get("heat_strength", 0.55) or 0.55)
+    st.session_state["bt_heatmap_style"]       = cfg.get("heatmap_style", "Branded heatmap")
+    st.session_state["bt_header_style"]        = cfg.get("header_style", "Keep original")
+
+    st.session_state["bt_col_format_rules"]    = bundle.get("col_format_rules", {}) or {}
+    st.session_state["bt_hidden_cols"]         = bundle.get("hidden_cols", []) or []
+
+    # enforce mutual exclusivity
+    if st.session_state["bt_show_footer_notes"]:
+        st.session_state["bt_show_heat_scale"] = False
+        if st.session_state["bt_footer_logo_align"] == "Center":
+            st.session_state["bt_footer_logo_align"] = "Right"
+    if st.session_state["bt_show_heat_scale"]:
+        st.session_state["bt_show_footer_notes"] = False
+
+    st.session_state["bt_editor_version"] = int(st.session_state.get("bt_editor_version", 0)) + 1
     st.session_state["bt_embed_tabs_visible"] = True
     st.session_state["bt_publish_in_progress"] = False
     st.session_state["bt_live_confirmed"] = True
-
-    st.session_state["bt_confirm_flash"] = True  # optional: show “loaded” message
+    st.session_state["bt_confirm_flash"] = True
     st.rerun()
 
 def is_page_live_with_hash(url: str, expected_hash: str) -> bool:
@@ -3735,10 +3751,10 @@ if main_tab == "Published Tables":
                                     st.caption(f"Only {owner_name} can edit this table.")
                                 else:
                                     has_csv = (row.get("Has CSV") == "✅")
-            
+
                                     if not has_csv:
                                         st.button("✏️ Edit this table", disabled=True, use_container_width=True)
-                                        st.caption("This table was published before editable CSV support.")
+                                        st.caption("Legacy table (no editable bundle). Re-publish once from Create New Table to enable full edit restore.")
                                     else:
                                         if st.button(
                                             "✏️ Edit this table",
@@ -3753,6 +3769,11 @@ if main_tab == "Published Tables":
                                             st.session_state.pop("pub_table_click_df", None)
                                         
                                             # ✅ load the bundle (this already calls st.rerun())
+                                            bundle_path = f"bundles/{selected_file}.json"
+                                            bundle_probe = read_github_json(publish_owner, selected_repo, token_to_use, bundle_path, branch="main")
+                                            if not bundle_probe:
+                                                st.error(f"Bundle not found at {bundle_path}. Cannot restore full table settings.")
+                                                st.stop()
                                             load_bundle_into_editor(publish_owner, selected_repo, token_to_use, selected_file)
                                                     
                             with c3:
@@ -3865,12 +3886,12 @@ if main_tab == "Create New Table":
     allowed_users = list(PUBLISH_USERS)
     created_by_options = ["Select a user..."] + allowed_users
 
-    st.session_state.setdefault("bt_created_by_user_select_create", "Select a user...")
+    st.session_state.setdefault("bt_created_by_user_select", "Select a user...")
 
     created_by_input_global = st.selectbox(
     "Created by (tracking only)",
     options=created_by_options,
-    key="bt_created_by_user_select_create",
+    key="bt_created_by_user_select",
     )
 
     created_by_user_global = ""
