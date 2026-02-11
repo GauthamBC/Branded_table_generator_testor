@@ -2391,6 +2391,10 @@ def generate_table_html_from_df(
 ) -> str:
 
     df = df.copy()
+
+    # Dynamic heights based on row count
+    row_count = len(df.index)
+    table_max_h = 680 if row_count > 10 else 400
     bar_columns_set = set(bar_columns or [])
     bar_max_overrides = bar_max_overrides or {}
     heat_columns_set = set(heat_columns or [])
@@ -2801,6 +2805,7 @@ def generate_table_html_from_df(
         .replace("[[FOOTER_ALIGN_CLASS]]", footer_align_class)
         .replace("[[CELL_ALIGN_CLASS]]", cell_align_class)
         .replace("[[BAR_FIXED_W]]", str(bar_fixed_w))
+        .replace("[[TABLE_MAX_H]]", str(table_max_h))
         .replace("[[FOOTER_LOGO_H]]", str(footer_logo_h))
         .replace("[[FOOTER_NOTES_VIS_CLASS]]", "" if (show_footer_notes and footer_notes_html) else "vi-hide")
         .replace("[[FOOTER_NOTES_HTML]]", footer_notes_html)
@@ -4918,9 +4923,11 @@ if main_tab == "Create New Table":
                                     col_format_rules=live_rules,
                                 )
                 
+                            preview_rows = len(df_preview.index) if isinstance(df_preview, pd.DataFrame) else 0
+                            preview_height = 820 if preview_rows > 10 else 560
                             components.html(
                                 st.session_state.get("bt_preview_html", ""),
-                                height=820,
+                                height=preview_height,
                                 scrolling=True,
                             )
                 else:
