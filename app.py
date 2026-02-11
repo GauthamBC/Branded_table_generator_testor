@@ -1171,14 +1171,20 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     
     /* body cell text clamp to max 3 lines */
     #bt-block .dw-cell{
-      display: block;
       white-space: normal;
       line-height: 1.35;
-      overflow-wrap: normal;
+      overflow-wrap: normal;   /* no mid-word split */
       word-break: normal;
       hyphens: none;
-      overflow: visible;
-      text-overflow: clip;
+    
+      /* body only: max 3 lines */
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+    
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     /* ======================================================
        ✅ FIXED BAR TRACK WIDTH + AUTO COLUMN EXPAND
