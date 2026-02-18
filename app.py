@@ -2077,7 +2077,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
          /* keep cell-level clamp rules in control */
         .vi-table-embed.export-mode #bt-block thead th,
         .vi-table-embed.export-mode #bt-block tbody td{
-          vertical-align: top !important;
+          vertical-align: middle !important;
         }
         
           /* ✅ REMOVE SORT ARROWS IN EXPORT MODE */
