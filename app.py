@@ -3364,6 +3364,34 @@ def on_heat_scale_toggle():
     if st.session_state.get("bt_show_heat_scale", False):
         st.session_state["bt_show_footer_notes"] = False
 
+
+def cache_draft_header_values():
+    """Persist the draft header inputs so they don't appear to 'reset' when views/radios rerun."""
+    st.session_state["bt_widget_title_cache"] = st.session_state.get("bt_widget_title", "Table 1")
+    st.session_state["bt_widget_subtitle_cache"] = st.session_state.get("bt_widget_subtitle", "Subheading")
+    st.session_state["bt_show_header_cache"] = st.session_state.get("bt_show_header", True)
+    st.session_state["bt_center_titles_cache"] = st.session_state.get("bt_center_titles", False)
+    st.session_state["bt_branded_title_color_cache"] = st.session_state.get("bt_branded_title_color", True)
+
+def restore_draft_header_values_if_missing():
+    """If any header keys are missing (e.g., cleared by another flow), restore from cache."""
+    st.session_state.setdefault("bt_widget_title_cache", st.session_state.get("bt_widget_title", "Table 1"))
+    st.session_state.setdefault("bt_widget_subtitle_cache", st.session_state.get("bt_widget_subtitle", "Subheading"))
+    st.session_state.setdefault("bt_show_header_cache", st.session_state.get("bt_show_header", True))
+    st.session_state.setdefault("bt_center_titles_cache", st.session_state.get("bt_center_titles", False))
+    st.session_state.setdefault("bt_branded_title_color_cache", st.session_state.get("bt_branded_title_color", True))
+
+    if "bt_widget_title" not in st.session_state:
+        st.session_state["bt_widget_title"] = st.session_state.get("bt_widget_title_cache", "Table 1")
+    if "bt_widget_subtitle" not in st.session_state:
+        st.session_state["bt_widget_subtitle"] = st.session_state.get("bt_widget_subtitle_cache", "Subheading")
+    if "bt_show_header" not in st.session_state:
+        st.session_state["bt_show_header"] = st.session_state.get("bt_show_header_cache", True)
+    if "bt_center_titles" not in st.session_state:
+        st.session_state["bt_center_titles"] = st.session_state.get("bt_center_titles_cache", False)
+    if "bt_branded_title_color" not in st.session_state:
+        st.session_state["bt_branded_title_color"] = st.session_state.get("bt_branded_title_color_cache", True)
+
 # =========================================================
 # Streamlit App
 # =========================================================
@@ -4050,6 +4078,9 @@ if main_tab == "Create New Table":
         
                 ensure_confirm_state_exists()
 
+                # ✅ Keep draft header edits stable when switching views
+                restore_draft_header_values_if_missing()
+
                 left_col, right_col = st.columns([1, 3], gap="large")
 
                 # ✅ Right side: Preview + Body Editor tabs
@@ -4138,6 +4169,7 @@ if main_tab == "Create New Table":
                         horizontal=True,
                         label_visibility="collapsed",
                         key="bt_left_view",
+                        on_change=cache_draft_header_values,
                     )
 
                     # ---------- EDIT TAB ----------
