@@ -2085,26 +2085,38 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
             content: "" !important;
           }
         
-          /* ✅ Header: same 3-line limit behavior in export */
+          \
+/* ✅ Header: keep <th> as table-cell in export (prevents stacked header bug) */
         .vi-table-embed.export-mode #bt-block thead th{
           white-space: normal !important;
           line-height: 1.15 !important;
           padding-top: 10px !important;
           padding-bottom: 10px !important;
-        
+
           /* no mid-word splitting */
           overflow-wrap: normal !important;
           word-break: normal !important;
           hyphens: none !important;
-        
-          /* clamp to max 3 lines */
+
+          /* IMPORTANT: do not change display on <th> */
+          overflow: visible !important;
+          text-overflow: clip !important;
+        }
+
+        /* ✅ Clamp the header LABEL, not the <th> (3 lines max) */
+        .vi-table-embed.export-mode #bt-block thead th .dw-th-label{
           display: -webkit-box !important;
           -webkit-box-orient: vertical !important;
           -webkit-line-clamp: 3 !important;
           line-clamp: 3 !important;
-        
+
           overflow: hidden !important;
           text-overflow: ellipsis !important;
+
+          white-space: normal !important;
+          overflow-wrap: normal !important;
+          word-break: normal !important;
+          hyphens: none !important;
         }
         
           /* ✅ Keep SAME 3-line clamp behavior in export (match interactive table) */
@@ -2139,7 +2151,17 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
           const ths = clone.querySelectorAll('#bt-block thead th');
         
           ths.forEach(th => {
-            const raw = (th.textContent || "").trim();
+            // Ensure we have a label span so export clamping works without breaking table layout
+            let label = th.querySelector('.dw-th-label');
+            if(!label){
+              label = document.createElement('span');
+              label.className = 'dw-th-label';
+              label.textContent = (th.textContent || '').trim();
+              th.textContent = '';
+              th.appendChild(label);
+            }
+        
+            const raw = (label.textContent || "").trim();
             if (!raw) return;
         
             // Only wrap long headers
