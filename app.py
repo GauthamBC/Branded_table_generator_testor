@@ -1563,6 +1563,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     const btnHtmlCurrent = embedWrap ? embedWrap.querySelector('#dw-copy-html-current') : null;
     
     const menuTitle = embedWrap ? embedWrap.querySelector('#dw-menu-title') : null;
+    window.__viMenuTitleEl = menuTitle;
 
     const emptyRow = tb.querySelector('.dw-empty');
     const pageStatus = document.getElementById('dw-page-status-text');
@@ -1983,18 +1984,10 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         cloneScroller.classList.add('no-scroll');
       }
 
-      // ✅ export width = full table scroll width (not viewport width)
-    const w = Math.max(900, Math.ceil(targetWidth || 1200));
+      // ✅ export width = widget width (consistent, legible)
+    const w = Math.max(900, Math.min(1600, Math.ceil(targetWidth || 1200)));
     clone.style.maxWidth = "none";
     clone.style.width = w + "px";
-    
-    // ✅ ensure the table itself isn't constrained by parent width
-    const cloneTable = clone.querySelector("table.dw-table");
-    if(cloneTable){
-      cloneTable.style.width = "max-content";
-      cloneTable.style.minWidth = "100%";
-    }
-
       await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
       await waitForFontsAndImages(clone);
 
@@ -2009,6 +2002,10 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       if(area > MAX_CAPTURE_AREA){
         stage.remove();
         console.warn("PNG export skipped: capture area too large.", { w, fullH, area });
+        if(window.__viMenuTitleEl){
+          window.__viMenuTitleEl.textContent = "Export too large — try Top 10 / Bottom 10";
+          setTimeout(()=>{ window.__viMenuTitleEl.textContent = "Choose action"; }, 2200);
+        }
         return;
       }
 
@@ -2241,19 +2238,11 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         const suffix = mode === 'bottom10' ? "_bottom10" : "_top10";
         const filename = (base + suffix).slice(0, 70);
 
-        // ✅ Measure TRUE full width AFTER the clone is in the DOM and overflow is unlocked
+        // ✅ Choose export width: match the on-page widget width (prevents tiny illegible PNGs)
         await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
 
-        const cloneTable = clone.querySelector("table.dw-table");
-        const cloneScroller = clone.querySelector(".dw-scroll");
-
-        // scrollWidth can be wrong until the table is laid out; take the max of several measurements
-        const w1 = Math.ceil(cloneTable?.scrollWidth || 0);
-        const w2 = Math.ceil(cloneTable?.getBoundingClientRect().width || 0);
-        const w3 = Math.ceil(cloneScroller?.scrollWidth || 0);
-        const w4 = Math.ceil(clone.getBoundingClientRect().width || 0);
-
-        const fullTableWidth = Math.max(1200, w1, w2, w3, w4);
+        const widgetW = Math.ceil(widget.getBoundingClientRect().width || 1200);
+        const fullTableWidth = Math.max(900, Math.min(1600, widgetW));
 
         await captureCloneToPng(clone, stage, filename, fullTableWidth);
 
