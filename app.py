@@ -1932,27 +1932,20 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
     function showRowsInClone(clone, mode){
       const cloneTb = clone.querySelector('#bt-block tbody');
       if (!cloneTb) return;
-    
+
       const cloneRows = Array.from(cloneTb.rows).filter(r => !r.classList.contains('dw-empty'));
-    
-      // Map clone rows by original data idx
-      const cloneByIdx = new Map();
-      cloneRows.forEach(r => cloneByIdx.set(String(r.dataset.idx), r));
-    
       const keep = new Set();
-    
-      // Full dataset order by original index
-      const allIdxAsc = ALL_ROWS
-        .map(r => Number(r.dataset.idx))
-        .filter(n => Number.isFinite(n))
-        .sort((a, b) => a - b);
-    
+
+      // ✅ Use CURRENT live DOM order (respects sorting), but never filter
+      const liveRowsInOrder = Array.from(tb.rows).filter(r => !r.classList.contains('dw-empty'));
+      const orderedIdx = liveRowsInOrder.map(r => String(r.dataset.idx));
+
       if (mode === 'top10'){
-        allIdxAsc.slice(0, 10).forEach(i => keep.add(String(i)));
+        orderedIdx.slice(0, 10).forEach(id => keep.add(id));
       } else if (mode === 'bottom10'){
-        allIdxAsc.slice(-10).forEach(i => keep.add(String(i))); // true bottom 10 from full dataset
+        orderedIdx.slice(-10).forEach(id => keep.add(id));
       } else if (mode === 'current'){
-        // only what is currently visible in preview
+        // only what is currently visible in preview (i.e., after search filter)
         PREVIEW_ROWS.forEach(r => {
           if (r.style.display !== 'none') keep.add(String(r.dataset.idx));
         });
@@ -1960,20 +1953,20 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         // fallback: show all preview rows
         PREVIEW_ROWS.forEach(r => keep.add(String(r.dataset.idx)));
       }
-    
+
       // Show/hide clone rows by idx
       cloneRows.forEach(r => {
         const on = keep.has(String(r.dataset.idx));
         r.style.display = on ? 'table-row' : 'none';
         r.classList.remove('dw-zebra-odd', 'dw-zebra-even');
       });
-    
+
       // Re-zebra visible rows
       const vis = cloneRows.filter(r => r.style.display !== 'none');
       vis.forEach((r, i) => {
         r.classList.add(i % 2 === 0 ? 'dw-zebra-odd' : 'dw-zebra-even');
       });
-    
+
       const empty = cloneTb.querySelector('.dw-empty');
       if (empty) empty.style.display = vis.length ? 'none' : 'table-row';
     }
