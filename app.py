@@ -2067,11 +2067,12 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         // ✅ Export-only CSS overrides (does NOT touch interactive table)
        const exportStyle = document.createElement("style");
         exportStyle.textContent = `
-          /* ✅ Let the table size itself naturally so headers never clip */
+          /* ✅ Keep export image width consistent with the on-page widget (prevents tiny-looking text)
+             and still allows header wrapping via wrapExportHeaders() */
           .vi-table-embed.export-mode #bt-block table.dw-table{
-            table-layout: auto !important;
-            width: max-content !important;
-            min-width: 100% !important;
+            table-layout: fixed !important;
+            width: 100% !important;
+            min-width: 0 !important;
           }
         
          /* keep cell-level clamp rules in control */
@@ -2079,6 +2080,16 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         .vi-table-embed.export-mode #bt-block tbody td{
           vertical-align: middle !important;
         }
+
+          .vi-table-embed.export-mode{
+                      font-size: 16px !important;
+                    }
+                    .vi-table-embed.export-mode #bt-block thead th{
+                      font-size: 16px !important;
+                    }
+                    .vi-table-embed.export-mode #bt-block tbody td{
+                      font-size: 16px !important;
+                    }
         
           /* ✅ REMOVE SORT ARROWS IN EXPORT MODE */
           .vi-table-embed.export-mode #bt-block thead th.sortable::after{
