@@ -3286,6 +3286,71 @@ def _cache_header_draft():
         if k in st.session_state:
             cache[k] = st.session_state.get(k)
 
+def restore_draft_state_from_confirmed():
+    """If a user has already Confirmed & Saved, make sure draft UI state never falls
+    back to defaults after a rerun (e.g., switching to 'Get Embed Script' and back).
+    We restore only when current draft values look empty/missing.
+    """
+    cfg = st.session_state.get("bt_confirmed_cfg") or {}
+    if not isinstance(cfg, dict) or not cfg:
+        return
+
+    # Map confirmed cfg keys -> session_state keys used by the editor/preview
+    mapping = {
+        "brand": "brand_table",
+        "title": "bt_widget_title",
+        "subtitle": "bt_widget_subtitle",
+        "striped": "bt_striped_rows",
+        "show_header": "bt_show_header",
+        "center_titles": "bt_center_titles",
+        "branded_title_color": "bt_branded_title_color",
+        "show_footer": "bt_show_footer",
+        "footer_logo_align": "bt_footer_logo_align",
+        "footer_logo_h": "bt_footer_logo_h",
+        "show_footer_notes": "bt_show_footer_notes",
+        "footer_notes": "bt_footer_notes",
+        "show_heat_scale": "bt_show_heat_scale",
+        "cell_align": "bt_cell_align",
+        "show_search": "bt_show_search",
+        "show_pager": "bt_show_pager",
+        "show_embed": "bt_show_embed",
+        "show_page_numbers": "bt_show_page_numbers",
+        "bar_columns": "bt_bar_columns",
+        "bar_max_overrides": "bt_bar_max_overrides",
+        "bar_fixed_w": "bt_bar_fixed_w",
+        "heat_columns": "bt_heat_columns",
+        "heat_overrides": "bt_heat_overrides",
+        "heat_strength": "bt_heat_strength",
+        "heatmap_style": "bt_heatmap_style",
+        "header_style": "bt_header_style",
+    }
+
+    def is_empty(v):
+        return v is None or v == "" or v == [] or v == {}  # noqa: E711
+
+    for cfg_key, ss_key in mapping.items():
+        if cfg_key not in cfg:
+            continue
+        confirmed_val = cfg.get(cfg_key)
+        # restore when key missing OR looks empty but confirmed has something
+        if ss_key not in st.session_state:
+            st.session_state[ss_key] = confirmed_val
+        else:
+            current_val = st.session_state.get(ss_key)
+            if is_empty(current_val) and not is_empty(confirmed_val):
+                st.session_state[ss_key] = confirmed_val
+
+    # Restore dataframe snapshot if draft df disappeared
+    if "bt_df_uploaded" not in st.session_state or st.session_state.get("bt_df_uploaded") is None:
+        if isinstance(st.session_state.get("bt_df_confirmed"), pd.DataFrame):
+            st.session_state["bt_df_uploaded"] = st.session_state["bt_df_confirmed"].copy()
+
+    # Hidden columns should also persist (not stored in cfg)
+    if "bt_hidden_cols" not in st.session_state and isinstance(st.session_state.get("bt_hidden_cols_draft"), list):
+        st.session_state["bt_hidden_cols"] = list(st.session_state.get("bt_hidden_cols_draft") or [])
+
+
+
 def _restore_header_draft():
     cache = st.session_state.get("bt_header_cache") or {}
     if not cache:
@@ -4082,6 +4147,7 @@ if main_tab == "Create New Table":
                     st.session_state["bt_df_confirmed"] = df_uploaded_now.copy(deep=True)  # confirmed snapshot seed
         
                 ensure_confirm_state_exists()
+                restore_draft_state_from_confirmed()
 
 
         
