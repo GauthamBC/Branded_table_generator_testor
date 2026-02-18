@@ -2186,9 +2186,20 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         const suffix = mode === 'bottom10' ? "_bottom10" : "_top10";
         const filename = (base + suffix).slice(0, 70);
 
+        // ✅ Measure TRUE full width AFTER the clone is in the DOM and overflow is unlocked
+        await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
+
         const cloneTable = clone.querySelector("table.dw-table");
-        const fullTableWidth = Math.ceil(cloneTable?.scrollWidth || clone.getBoundingClientRect().width || 1200);
-        
+        const cloneScroller = clone.querySelector(".dw-scroll");
+
+        // scrollWidth can be wrong until the table is laid out; take the max of several measurements
+        const w1 = Math.ceil(cloneTable?.scrollWidth || 0);
+        const w2 = Math.ceil(cloneTable?.getBoundingClientRect().width || 0);
+        const w3 = Math.ceil(cloneScroller?.scrollWidth || 0);
+        const w4 = Math.ceil(clone.getBoundingClientRect().width || 0);
+
+        const fullTableWidth = Math.max(1200, w1, w2, w3, w4);
+
         await captureCloneToPng(clone, stage, filename, fullTableWidth);
 
       }catch(err){
