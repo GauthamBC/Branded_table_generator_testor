@@ -3348,7 +3348,6 @@ def restore_draft_state_from_confirmed():
         "bt_widget_title": "Table 1",
         "bt_widget_subtitle": "Subheading",
         "bt_header_style": "Keep original",
-        "bt_show_embed": True,
         "bt_show_footer_notes": False,
         "bt_footer_notes": "",
         # These are set in ensure_confirm_state_exists:
