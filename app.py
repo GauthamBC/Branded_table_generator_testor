@@ -4559,7 +4559,6 @@ if main_tab == "Create New Table":
                         
                                 st.checkbox(
                                     "Show Embed / Download Button",
-                                    value=st.session_state.get("bt_show_embed", True),
                                     key="bt_show_embed",
                                 )
                         
