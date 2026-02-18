@@ -3304,6 +3304,11 @@ def restore_draft_state_from_confirmed():
     if not isinstance(cfg, dict) or not cfg:
         return
 
+    # Only run "snapback to defaults" restoration when returning from Embed tab.
+    current_view = st.session_state.get("bt_left_view", "Edit table contents")
+    prev_view = st.session_state.get("__bt_prev_left_view")
+    coming_back_from_embed = (current_view == "Edit table contents" and prev_view == "Get Embed Script")
+
     # Confirmed cfg keys -> session_state keys used by the editor/preview
     mapping = {
         "brand": "brand_table",
@@ -3350,6 +3355,7 @@ def restore_draft_state_from_confirmed():
         "bt_header_style": "Keep original",
         "bt_show_footer_notes": False,
         "bt_footer_notes": "",
+        "bt_show_embed": True,
         # These are set in ensure_confirm_state_exists:
         "bt_footer_logo_align": "Center",
         "bt_footer_logo_h": 36,
@@ -3384,8 +3390,9 @@ def restore_draft_state_from_confirmed():
             st.session_state[ss_key] = confirmed_val
             continue
 
-        # 2) If current snapped back to a known default, but confirmed differs, restore
-        if ss_key in known_defaults:
+        # 2) If current snapped back to a known default (typically after tab switch),
+        # but confirmed differs, restore.
+        if coming_back_from_embed and ss_key in known_defaults:
             d = known_defaults[ss_key]
             if current_val == d and confirmed_val != d:
                 st.session_state[ss_key] = confirmed_val
@@ -3393,6 +3400,9 @@ def restore_draft_state_from_confirmed():
 
         # 3) For booleans: if confirmed differs and current equals False/True due to reset,
         # restore ONLY when it matches known default (handled above). Otherwise leave it.
+
+    # Track view so we can detect when the user returns from Embed tab.
+    st.session_state["__bt_prev_left_view"] = current_view
 
     # Restore dataframe snapshot if draft df disappeared
     if "bt_df_uploaded" not in st.session_state or st.session_state.get("bt_df_uploaded") is None:
