@@ -3268,6 +3268,39 @@ def ensure_confirm_state_exists():
     st.session_state.setdefault("bt_body_apply_flash", False)
     st.session_state.setdefault("bt_editor_version", 0)
 
+
+# =========================================================
+# Header draft persistence across view switches
+# (prevents title/subtitle resetting when navigating to Embed Script)
+# =========================================================
+def _cache_header_draft():
+    st.session_state.setdefault("bt_header_cache", {})
+    cache = st.session_state["bt_header_cache"]
+    for k in [
+        "bt_show_header",
+        "bt_widget_title",
+        "bt_widget_subtitle",
+        "bt_center_titles",
+        "bt_branded_title_color",
+    ]:
+        if k in st.session_state:
+            cache[k] = st.session_state.get(k)
+
+def _restore_header_draft():
+    cache = st.session_state.get("bt_header_cache") or {}
+    if not cache:
+        return
+    # Restore if key is missing or has fallen back to defaults
+    defaults = {"bt_widget_title": "Table 1", "bt_widget_subtitle": "Subheading"}
+    for k, v in cache.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+            continue
+        cur = st.session_state.get(k)
+        if k in defaults and (cur is None or str(cur).strip() == "" or str(cur).strip() == defaults[k]) and str(v).strip() not in ("", defaults[k]):
+            st.session_state[k] = v
+
+
 def sync_bar_override(col: str):
     """
     Immediately sync a single override input into bt_bar_max_overrides.
@@ -3363,34 +3396,6 @@ def on_heat_scale_toggle():
     # if heat scale turned ON, force notes OFF
     if st.session_state.get("bt_show_heat_scale", False):
         st.session_state["bt_show_footer_notes"] = False
-
-
-def cache_draft_header_values():
-    """Persist the draft header inputs so they don't appear to 'reset' when views/radios rerun."""
-    st.session_state["bt_widget_title_cache"] = st.session_state.get("bt_widget_title", "Table 1")
-    st.session_state["bt_widget_subtitle_cache"] = st.session_state.get("bt_widget_subtitle", "Subheading")
-    st.session_state["bt_show_header_cache"] = st.session_state.get("bt_show_header", True)
-    st.session_state["bt_center_titles_cache"] = st.session_state.get("bt_center_titles", False)
-    st.session_state["bt_branded_title_color_cache"] = st.session_state.get("bt_branded_title_color", True)
-
-def restore_draft_header_values_if_missing():
-    """If any header keys are missing (e.g., cleared by another flow), restore from cache."""
-    st.session_state.setdefault("bt_widget_title_cache", st.session_state.get("bt_widget_title", "Table 1"))
-    st.session_state.setdefault("bt_widget_subtitle_cache", st.session_state.get("bt_widget_subtitle", "Subheading"))
-    st.session_state.setdefault("bt_show_header_cache", st.session_state.get("bt_show_header", True))
-    st.session_state.setdefault("bt_center_titles_cache", st.session_state.get("bt_center_titles", False))
-    st.session_state.setdefault("bt_branded_title_color_cache", st.session_state.get("bt_branded_title_color", True))
-
-    if "bt_widget_title" not in st.session_state:
-        st.session_state["bt_widget_title"] = st.session_state.get("bt_widget_title_cache", "Table 1")
-    if "bt_widget_subtitle" not in st.session_state:
-        st.session_state["bt_widget_subtitle"] = st.session_state.get("bt_widget_subtitle_cache", "Subheading")
-    if "bt_show_header" not in st.session_state:
-        st.session_state["bt_show_header"] = st.session_state.get("bt_show_header_cache", True)
-    if "bt_center_titles" not in st.session_state:
-        st.session_state["bt_center_titles"] = st.session_state.get("bt_center_titles_cache", False)
-    if "bt_branded_title_color" not in st.session_state:
-        st.session_state["bt_branded_title_color"] = st.session_state.get("bt_branded_title_color_cache", True)
 
 # =========================================================
 # Streamlit App
@@ -4078,8 +4083,9 @@ if main_tab == "Create New Table":
         
                 ensure_confirm_state_exists()
 
-                # ✅ Keep draft header edits stable when switching views
-                restore_draft_header_values_if_missing()
+
+        
+                _restore_header_draft()
 
                 left_col, right_col = st.columns([1, 3], gap="large")
 
@@ -4168,8 +4174,8 @@ if main_tab == "Create New Table":
                         ["Edit table contents", "Get Embed Script"],
                         horizontal=True,
                         label_visibility="collapsed",
+                        on_change=_cache_header_draft,
                         key="bt_left_view",
-                        on_change=cache_draft_header_values,
                     )
 
                     # ---------- EDIT TAB ----------
@@ -4203,13 +4209,11 @@ if main_tab == "Create New Table":
 
                                 st.text_input(
                                     "Table Title",
-                                    value=st.session_state.get("bt_widget_title", "Table 1"),
                                     key="bt_widget_title",
                                     disabled=not show_header,
                                 )
                                 st.text_input(
                                     "Table Subtitle",
-                                    value=st.session_state.get("bt_widget_subtitle", "Subheading"),
                                     key="bt_widget_subtitle",
                                     disabled=not show_header,
                                 )
