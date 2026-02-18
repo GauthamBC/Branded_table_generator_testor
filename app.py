@@ -3274,17 +3274,63 @@ def ensure_confirm_state_exists():
 # (prevents title/subtitle resetting when navigating to Embed Script)
 # =========================================================
 def _cache_header_draft():
+    """Cache ALL editor settings before switching away from the Edit view.
+
+    Streamlit may drop widget values for widgets that are not rendered on a rerun
+    (e.g., when switching to 'Get Embed Script'). We cache the full editor state
+    so it can be restored when you come back.
+    """
+    import copy as _copy
+
     st.session_state.setdefault("bt_header_cache", {})
     cache = st.session_state["bt_header_cache"]
-    for k in [
+
+    # Keep this list aligned with init defaults + what draft_config_from_state reads
+    keys_to_cache = [
+        # header
         "bt_show_header",
         "bt_widget_title",
         "bt_widget_subtitle",
         "bt_center_titles",
         "bt_branded_title_color",
-    ]:
+
+        # footer
+        "bt_show_footer",
+        "bt_footer_logo_align",
+        "bt_footer_logo_h",
+        "bt_show_footer_notes",
+        "bt_footer_notes",
+        "bt_show_heat_scale",
+
+        # body / controls
+        "bt_striped_rows",
+        "bt_cell_align",
+        "bt_header_style",
+        "bt_show_search",
+        "bt_show_pager",
+        "bt_show_page_numbers",
+        "bt_show_embed",
+
+        # bars
+        "bt_bar_columns",
+        "bt_bar_max_overrides",
+        "bt_bar_fixed_w",
+
+        # heat
+        "bt_heat_columns",
+        "bt_heat_overrides",
+        "bt_heat_strength",
+        "bt_heatmap_style",
+
+        # formatting / hidden cols
+        "bt_col_format_rules",
+        "bt_hidden_cols",
+        "bt_hidden_cols_draft",
+    ]
+
+    for k in keys_to_cache:
         if k in st.session_state:
-            cache[k] = st.session_state.get(k)
+            cache[k] = _copy.deepcopy(st.session_state.get(k))
 
 def restore_draft_state_from_confirmed():
     """If a user has already Confirmed & Saved, make sure draft UI state never falls
@@ -3352,19 +3398,44 @@ def restore_draft_state_from_confirmed():
 
 
 def _restore_header_draft():
+    """Restore cached editor settings when returning from non-edit views."""
+    import copy as _copy
+
     cache = st.session_state.get("bt_header_cache") or {}
     if not cache:
         return
-    # Restore if key is missing or has fallen back to defaults
-    defaults = {"bt_widget_title": "Table 1", "bt_widget_subtitle": "Subheading"}
+
+    defaults = {
+        "bt_widget_title": "Table 1",
+        "bt_widget_subtitle": "Subheading",
+        "bt_header_style": "Keep original",
+        "bt_show_embed": True,
+        "bt_show_search": True,
+        "bt_show_pager": True,
+        "bt_show_page_numbers": True,
+    }
+
+    def _is_empty(x):
+        return x is None or x == "" or x == [] or x == {}  # noqa: E711
+
+    def _looks_default(k, cur):
+        if k not in defaults:
+            return False
+        d = defaults[k]
+        if isinstance(d, str):
+            return (cur is None) or (str(cur).strip() == "") or (str(cur).strip() == d)
+        return cur == d
+
     for k, v in cache.items():
         if k not in st.session_state:
-            st.session_state[k] = v
+            st.session_state[k] = _copy.deepcopy(v)
             continue
-        cur = st.session_state.get(k)
-        if k in defaults and (cur is None or str(cur).strip() == "" or str(cur).strip() == defaults[k]) and str(v).strip() not in ("", defaults[k]):
-            st.session_state[k] = v
 
+        cur = st.session_state.get(k)
+
+        # If Streamlit recreated the widget with a default OR an empty value, swap back
+        if (_looks_default(k, cur) and not _looks_default(k, v)) or (_is_empty(cur) and not _is_empty(v)):
+            st.session_state[k] = _copy.deepcopy(v)
 
 def sync_bar_override(col: str):
     """
