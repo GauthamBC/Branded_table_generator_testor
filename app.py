@@ -2118,6 +2118,28 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
           word-break: normal !important;
           hyphens: none !important;
         }
+
+
+        /* ✅ Export: force true vertical centering in header (html2canvas-safe) */
+        .vi-table-embed.export-mode #bt-block thead th{
+          padding: 0 !important;              /* move padding to label for reliable centering */
+          vertical-align: middle !important;
+        }
+        .vi-table-embed.export-mode #bt-block thead th .dw-th-label{
+          display: flex !important;
+          flex-direction: column !important;
+          justify-content: center !important;
+          align-items: center !important;
+          height: 100% !important;
+          padding: 10px 14px !important;
+          text-align: center !important;
+          line-height: 1.15 !important;
+
+          /* override clamp props (flex can't clamp reliably) */
+          -webkit-line-clamp: unset !important;
+          line-clamp: unset !important;
+          -webkit-box-orient: unset !important;
+        }
         
           /* ✅ Keep SAME 3-line clamp behavior in export (match interactive table) */
         .vi-table-embed.export-mode #bt-block .dw-cell{
@@ -2193,9 +2215,9 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
             if (lines.length > 3) {
               const firstTwo = lines.slice(0, 2);
               const rest = lines.slice(2).join(" ");
-              th.innerHTML = [...firstTwo, rest].join("<br>");
+              label.innerHTML = [...firstTwo, rest].join("<br>");
             } else {
-              th.innerHTML = lines.join("<br>");
+              label.innerHTML = lines.join("<br>");
             }
           });
         }
