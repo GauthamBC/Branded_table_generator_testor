@@ -3274,74 +3274,37 @@ def ensure_confirm_state_exists():
 # (prevents title/subtitle resetting when navigating to Embed Script)
 # =========================================================
 def _cache_header_draft():
-    """Cache ALL editor settings before switching away from the Edit view.
-
-    Streamlit may drop widget values for widgets that are not rendered on a rerun
-    (e.g., when switching to 'Get Embed Script'). We cache the full editor state
-    so it can be restored when you come back.
-    """
-    import copy as _copy
-
     st.session_state.setdefault("bt_header_cache", {})
     cache = st.session_state["bt_header_cache"]
-
-    # Keep this list aligned with init defaults + what draft_config_from_state reads
-    keys_to_cache = [
-        # header
+    for k in [
         "bt_show_header",
         "bt_widget_title",
         "bt_widget_subtitle",
         "bt_center_titles",
         "bt_branded_title_color",
-
-        # footer
-        "bt_show_footer",
-        "bt_footer_logo_align",
-        "bt_footer_logo_h",
-        "bt_show_footer_notes",
-        "bt_footer_notes",
-        "bt_show_heat_scale",
-
-        # body / controls
-        "bt_striped_rows",
-        "bt_cell_align",
-        "bt_header_style",
-        "bt_show_search",
-        "bt_show_pager",
-        "bt_show_page_numbers",
-        "bt_show_embed",
-
-        # bars
-        "bt_bar_columns",
-        "bt_bar_max_overrides",
-        "bt_bar_fixed_w",
-
-        # heat
-        "bt_heat_columns",
-        "bt_heat_overrides",
-        "bt_heat_strength",
-        "bt_heatmap_style",
-
-        # formatting / hidden cols
-        "bt_col_format_rules",
-        "bt_hidden_cols",
-        "bt_hidden_cols_draft",
-    ]
-
-    for k in keys_to_cache:
+    ]:
         if k in st.session_state:
-            cache[k] = _copy.deepcopy(st.session_state.get(k))
+            cache[k] = st.session_state.get(k)
+
 
 def restore_draft_state_from_confirmed():
-    """If a user has already Confirmed & Saved, make sure draft UI state never falls
-    back to defaults after a rerun (e.g., switching to 'Get Embed Script' and back).
-    We restore only when current draft values look empty/missing.
+    """Keep the *editor* (draft) UI state in sync with the last Confirm & Save.
+
+    Streamlit reruns wipe widget values that aren't rendered on a given run.
+    When the user switches to 'Get Embed Script' and back, some draft keys can
+    silently fall back to defaults (e.g., show_embed=True, show_footer_notes=False),
+    even though the user already confirmed different settings.
+
+    Strategy:
+      - Restore when a key is missing
+      - OR when it looks like it snapped back to a known default and confirmed differs
+      - OR when a value is empty AND confirmed isn't
     """
     cfg = st.session_state.get("bt_confirmed_cfg") or {}
     if not isinstance(cfg, dict) or not cfg:
         return
 
-    # Map confirmed cfg keys -> session_state keys used by the editor/preview
+    # Confirmed cfg keys -> session_state keys used by the editor/preview
     mapping = {
         "brand": "brand_table",
         "title": "bt_widget_title",
@@ -3350,25 +3313,56 @@ def restore_draft_state_from_confirmed():
         "show_header": "bt_show_header",
         "center_titles": "bt_center_titles",
         "branded_title_color": "bt_branded_title_color",
+
         "show_footer": "bt_show_footer",
         "footer_logo_align": "bt_footer_logo_align",
         "footer_logo_h": "bt_footer_logo_h",
+
         "show_footer_notes": "bt_show_footer_notes",
         "footer_notes": "bt_footer_notes",
+
         "show_heat_scale": "bt_show_heat_scale",
+        "heat_scale_label_mode": "bt_heat_scale_label_mode",
+
         "cell_align": "bt_cell_align",
         "show_search": "bt_show_search",
         "show_pager": "bt_show_pager",
         "show_embed": "bt_show_embed",
         "show_page_numbers": "bt_show_page_numbers",
+
         "bar_columns": "bt_bar_columns",
         "bar_max_overrides": "bt_bar_max_overrides",
         "bar_fixed_w": "bt_bar_fixed_w",
+
         "heat_columns": "bt_heat_columns",
         "heat_overrides": "bt_heat_overrides",
         "heat_strength": "bt_heat_strength",
         "heatmap_style": "bt_heatmap_style",
+
         "header_style": "bt_header_style",
+    }
+
+    # Known defaults that commonly re-appear after reruns (these are the ones we
+    # want to override back to confirmed if confirmed differs)
+    known_defaults = {
+        "bt_widget_title": "Table 1",
+        "bt_widget_subtitle": "Subheading",
+        "bt_header_style": "Keep original",
+        "bt_show_embed": True,
+        "bt_show_footer_notes": False,
+        "bt_footer_notes": "",
+        # These are set in ensure_confirm_state_exists:
+        "bt_footer_logo_align": "Center",
+        "bt_footer_logo_h": 36,
+        "bt_show_heat_scale": False,
+        "bt_heat_scale_label_mode": "Low/High",
+        "bt_bar_columns": [],
+        "bt_bar_max_overrides": {},
+        "bt_bar_fixed_w": 200,
+        "bt_heat_columns": [],
+        "bt_heat_overrides": {},
+        "bt_heat_strength": 0.55,
+        "bt_heatmap_style": "Branded heatmap",
     }
 
     def is_empty(v):
@@ -3378,64 +3372,52 @@ def restore_draft_state_from_confirmed():
         if cfg_key not in cfg:
             continue
         confirmed_val = cfg.get(cfg_key)
-        # restore when key missing OR looks empty but confirmed has something
+
+        # If draft key is missing, restore immediately
         if ss_key not in st.session_state:
             st.session_state[ss_key] = confirmed_val
-        else:
-            current_val = st.session_state.get(ss_key)
-            if is_empty(current_val) and not is_empty(confirmed_val):
+            continue
+
+        current_val = st.session_state.get(ss_key)
+
+        # 1) If current is empty but confirmed isn't, restore
+        if is_empty(current_val) and not is_empty(confirmed_val):
+            st.session_state[ss_key] = confirmed_val
+            continue
+
+        # 2) If current snapped back to a known default, but confirmed differs, restore
+        if ss_key in known_defaults:
+            d = known_defaults[ss_key]
+            if current_val == d and confirmed_val != d:
                 st.session_state[ss_key] = confirmed_val
+                continue
+
+        # 3) For booleans: if confirmed differs and current equals False/True due to reset,
+        # restore ONLY when it matches known default (handled above). Otherwise leave it.
 
     # Restore dataframe snapshot if draft df disappeared
     if "bt_df_uploaded" not in st.session_state or st.session_state.get("bt_df_uploaded") is None:
         if isinstance(st.session_state.get("bt_df_confirmed"), pd.DataFrame):
             st.session_state["bt_df_uploaded"] = st.session_state["bt_df_confirmed"].copy()
 
-    # Hidden columns should also persist (not stored in cfg)
+    # Hidden columns: keep draft + confirmed aligned (if present)
     if "bt_hidden_cols" not in st.session_state and isinstance(st.session_state.get("bt_hidden_cols_draft"), list):
         st.session_state["bt_hidden_cols"] = list(st.session_state.get("bt_hidden_cols_draft") or [])
 
-
-
 def _restore_header_draft():
-    """Restore cached editor settings when returning from non-edit views."""
-    import copy as _copy
-
     cache = st.session_state.get("bt_header_cache") or {}
     if not cache:
         return
-
-    defaults = {
-        "bt_widget_title": "Table 1",
-        "bt_widget_subtitle": "Subheading",
-        "bt_header_style": "Keep original",
-        "bt_show_embed": True,
-        "bt_show_search": True,
-        "bt_show_pager": True,
-        "bt_show_page_numbers": True,
-    }
-
-    def _is_empty(x):
-        return x is None or x == "" or x == [] or x == {}  # noqa: E711
-
-    def _looks_default(k, cur):
-        if k not in defaults:
-            return False
-        d = defaults[k]
-        if isinstance(d, str):
-            return (cur is None) or (str(cur).strip() == "") or (str(cur).strip() == d)
-        return cur == d
-
+    # Restore if key is missing or has fallen back to defaults
+    defaults = {"bt_widget_title": "Table 1", "bt_widget_subtitle": "Subheading"}
     for k, v in cache.items():
         if k not in st.session_state:
-            st.session_state[k] = _copy.deepcopy(v)
+            st.session_state[k] = v
             continue
-
         cur = st.session_state.get(k)
+        if k in defaults and (cur is None or str(cur).strip() == "" or str(cur).strip() == defaults[k]) and str(v).strip() not in ("", defaults[k]):
+            st.session_state[k] = v
 
-        # If Streamlit recreated the widget with a default OR an empty value, swap back
-        if (_looks_default(k, cur) and not _looks_default(k, v)) or (_is_empty(cur) and not _is_empty(v)):
-            st.session_state[k] = _copy.deepcopy(v)
 
 def sync_bar_override(col: str):
     """
