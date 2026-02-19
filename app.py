@@ -727,45 +727,6 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       --footer-logo-h: [[FOOTER_LOGO_H]]px;
     }
 
-
-
-    /* ✅ Branded scrollbars (entire preview + any scroll containers) */
-    .vi-table-embed{
-      --sb-track: rgba(0,0,0,0.06);
-      --sb-thumb: rgba(var(--brand-500-rgb), 0.55);
-      --sb-thumb-hover: rgba(var(--brand-500-rgb), 0.75);
-    }
-
-    html, body, .vi-table-embed{
-      scrollbar-width: thin; /* Firefox */
-      scrollbar-color: var(--sb-thumb) var(--sb-track);
-    }
-
-    html::-webkit-scrollbar,
-    body::-webkit-scrollbar,
-    .vi-table-embed::-webkit-scrollbar{
-      width: 10px;
-      height: 10px;
-    }
-    html::-webkit-scrollbar-track,
-    body::-webkit-scrollbar-track,
-    .vi-table-embed::-webkit-scrollbar-track{
-      background: var(--sb-track);
-      border-radius: 9999px;
-    }
-    html::-webkit-scrollbar-thumb,
-    body::-webkit-scrollbar-thumb,
-    .vi-table-embed::-webkit-scrollbar-thumb{
-      background: var(--sb-thumb);
-      border-radius: 9999px;
-      border: 2px solid transparent;
-      background-clip: content-box;
-    }
-    html::-webkit-scrollbar-thumb:hover,
-    body::-webkit-scrollbar-thumb:hover,
-    .vi-table-embed::-webkit-scrollbar-thumb:hover{
-      background: var(--sb-thumb-hover);
-    }
     .vi-table-embed.align-left { --cell-align:left; }
     .vi-table-embed.align-center { --cell-align:center; }
     .vi-table-embed.align-right { --cell-align:right; }
@@ -1104,13 +1065,13 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
       scrollbar-gutter: stable;
       overscroll-behavior-x: contain;
       scrollbar-width: thin;
-      scrollbar-color: var(--sb-thumb) var(--sb-track);
+      scrollbar-color: var(--scroll-thumb) transparent;
     }
 
     #bt-block .dw-scroll::-webkit-scrollbar{ width: 8px; height: 8px; }
-    #bt-block .dw-scroll::-webkit-scrollbar-track{ background: var(--sb-track); }
+    #bt-block .dw-scroll::-webkit-scrollbar-track{ background: transparent; }
     #bt-block .dw-scroll::-webkit-scrollbar-thumb{
-      background: var(--sb-thumb);
+      background: var(--scroll-thumb);
       border-radius: 9999px;
       border: 2px solid transparent;
       background-clip: content-box;
