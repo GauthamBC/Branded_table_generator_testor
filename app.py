@@ -2115,8 +2115,8 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         .vi-table-embed.export-mode #bt-block thead th .dw-th-label{
           display: -webkit-box !important;
           -webkit-box-orient: vertical !important;
-          -webkit-line-clamp: 3 !important;
-          line-clamp: 3 !important;
+          -webkit-line-clamp: 2 !important;
+          line-clamp: 2 !important;
 
           overflow: hidden !important;
           text-overflow: ellipsis !important;
@@ -2128,28 +2128,7 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         }
 
 
-        /* ✅ Export: force true vertical centering in header (html2canvas-safe) */
-        .vi-table-embed.export-mode #bt-block thead th{
-          padding: 0 !important;              /* move padding to label for reliable centering */
-          vertical-align: middle !important;
-        }
-        .vi-table-embed.export-mode #bt-block thead th .dw-th-label{
-          display: flex !important;
-          flex-direction: column !important;
-          justify-content: center !important;
-          align-items: center !important;
-          height: 100% !important;
-          padding: 10px 14px !important;
-          text-align: center !important;
-          line-height: 1.15 !important;
-
-          /* override clamp props (flex can't clamp reliably) */
-          -webkit-line-clamp: unset !important;
-          line-clamp: unset !important;
-          -webkit-box-orient: unset !important;
-        }
-        
-          /* ✅ Keep SAME 3-line clamp behavior in export (match interactive table) */
+        /* ✅ Keep SAME 3-line clamp behavior in export (match interactive table) */
         .vi-table-embed.export-mode #bt-block .dw-cell{
           white-space: normal !important;
           word-break: normal !important;      /* no mid-word split */
@@ -2160,8 +2139,8 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
         
           display: -webkit-box !important;
           -webkit-box-orient: vertical !important;
-          -webkit-line-clamp: 3 !important;
-          line-clamp: 3 !important;
+          -webkit-line-clamp: 2 !important;
+          line-clamp: 2 !important;
         
           overflow: hidden !important;
           text-overflow: ellipsis !important;
@@ -2177,9 +2156,9 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
 
         stage.appendChild(clone);
         document.body.appendChild(stage);
-        function wrapExportHeaders(clone, maxLineLen = 15){
+                function wrapExportHeaders(clone, maxLineLen = 15){
           const ths = clone.querySelectorAll('#bt-block thead th');
-        
+
           ths.forEach(th => {
             // Ensure we have a label span so export clamping works without breaking table layout
             let label = th.querySelector('.dw-th-label');
@@ -2190,27 +2169,25 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
               th.textContent = '';
               th.appendChild(label);
             }
-        
+
             const raw = (label.textContent || "").trim();
             if (!raw) return;
-        
+
             // Only wrap long headers
             if (raw.length <= maxLineLen) return;
-        
+
             const txt = raw.replace(/_/g, " ");
             const words = txt.split(/\s+/).filter(Boolean);
             if (words.length <= 1) return;
-        
-            // ✅ Build lines in the ORIGINAL order (no flipping)
+
+            // Build lines in original order
             const lines = [""];
             for (const w of words) {
               const cur = lines[lines.length - 1];
-        
               if (!cur) {
                 lines[lines.length - 1] = w;
                 continue;
               }
-        
               const test = cur + " " + w;
               if (test.length <= maxLineLen) {
                 lines[lines.length - 1] = test;
@@ -2218,12 +2195,12 @@ HTML_TEMPLATE_TABLE = r"""<!doctype html>
                 lines.push(w);
               }
             }
-        
-            // ✅ Optional: clamp to 3 lines max
-            if (lines.length > 3) {
-              const firstTwo = lines.slice(0, 2);
-              const rest = lines.slice(2).join(" ");
-              label.innerHTML = [...firstTwo, rest].join("<br>");
+
+            // ✅ Hard cap to 2 lines (anything extra gets merged into line 2)
+            if (lines.length > 2) {
+              const line1 = lines[0];
+              const line2 = [lines[1], ...lines.slice(2)].join(" ");
+              label.innerHTML = [line1, line2].join("<br>");
             } else {
               label.innerHTML = lines.join("<br>");
             }
