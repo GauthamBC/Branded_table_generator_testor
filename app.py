@@ -2966,11 +2966,28 @@ def compute_pages_url(user: str, repo: str, filename: str) -> str:
     return f"https://{user}.github.io/{repo}/{filename}"
     
 def build_publish_bundle(widget_file_name: str) -> dict:
-    # IMPORTANT: keep this aligned with what your editor actually uses
-    cfg = draft_config_from_state()
+    """
+    Build the editable bundle that gets saved to GitHub (bundles/<file>.json).
+
+    IMPORTANT:
+    - If the user has clicked **Confirm & Save**, we prefer the CONFIRMED snapshot
+      (bt_df_confirmed + bt_confirmed_cfg) so the bundle always matches the HTML
+      that was actually published.
+    - Otherwise we fall back to the current live draft state.
+    """
+    # Prefer CONFIRMED snapshot when available (keeps bundle aligned with published HTML)
+    cfg = st.session_state.get("bt_confirmed_cfg")
+    if not isinstance(cfg, dict) or not cfg:
+        cfg = draft_config_from_state()
+
+    # Live-only formatting rules are still saved so edits are retained when re-opening
     rules = st.session_state.get("bt_col_format_rules", {}) or {}
 
-    df = st.session_state.get("bt_df_uploaded")
+    # Prefer confirmed df (matches confirmed HTML); fallback to current upload
+    df = st.session_state.get("bt_df_confirmed")
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        df = st.session_state.get("bt_df_uploaded")
+
     if isinstance(df, pd.DataFrame) and not df.empty:
         csv_text = df.to_csv(index=False)
     else:
@@ -2979,23 +2996,31 @@ def build_publish_bundle(widget_file_name: str) -> dict:
     bundle = {
         "schema_version": 1,
         "widget_file_name": widget_file_name,
+
+        # high-level metadata
         "brand": st.session_state.get("brand_table", ""),
         "created_by": (st.session_state.get("bt_created_by_user", "") or "").strip().lower(),
         "created_at_utc": datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+
+        # naming + header text
         "table_name_words": st.session_state.get("bt_table_name_words", ""),
         "widget_title": st.session_state.get("bt_widget_title", ""),
         "widget_subtitle": st.session_state.get("bt_widget_subtitle", ""),
+
+        # core state (everything needed to fully restore the editor)
         "config": cfg,
         "col_format_rules": rules,
         "csv": csv_text,
         "hidden_cols": st.session_state.get("bt_hidden_cols", []) or [],
+
+        # keep these for backward/forward compatibility (some older bundles used top-level keys)
         "bar_columns": st.session_state.get("bt_bar_columns", []) or [],
         "bar_max_overrides": st.session_state.get("bt_bar_max_overrides", {}) or {},
         "heat_columns": st.session_state.get("bt_heat_columns", []) or [],
         "heat_overrides": st.session_state.get("bt_heat_overrides", {}) or {},
     }
     return bundle
-    
+
 def load_bundle_into_editor(owner: str, repo: str, token: str, widget_file_name: str):
     bundle_path = f"bundles/{widget_file_name}.json"
     bundle = read_github_json(owner, repo, token, bundle_path, branch="main")
