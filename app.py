@@ -3577,8 +3577,44 @@ st.markdown(
 )
 
 st.title("Branded Table Generator")
+
+# =========================================================
+# ✅ GLOBAL "WHO ARE YOU?" (shared across both tabs)
+# =========================================================
+allowed_users = list(PUBLISH_USERS)
+created_by_options = ["Select a user..."] + allowed_users
+
+# one shared dropdown state
+st.session_state.setdefault("bt_created_by_user_select", "Select a user...")
+st.session_state.setdefault("bt_created_by_user", "")
+
+created_by_choice = st.selectbox(
+    "Created by (tracking only)",
+    options=created_by_options,
+    key="bt_created_by_user_select",
+)
+
+chosen_user = ""
+if created_by_choice and created_by_choice != "Select a user...":
+    chosen_user = created_by_choice.strip().lower()
+
+# If we're editing a restored bundle, allow placeholder to keep the bundle's created_by
+if st.session_state.get("bt_editing_from_bundle", False) and not chosen_user:
+    chosen_user = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
+
+st.session_state["bt_created_by_user"] = chosen_user
+
+# =========================================================
+# Main tabs
+# =========================================================
 st.session_state.setdefault("main_tab", "Create New Table")
-main_tab = st.radio("", ["Create New Table", "Published Tables"], horizontal=True, key="main_tab", label_visibility="collapsed")
+main_tab = st.radio(
+    "",
+    ["Create New Table", "Published Tables"],
+    horizontal=True,
+    key="main_tab",
+    label_visibility="collapsed",
+)
 
 # =========================================================
 # ✅ TAB 2: Published Tables  (ONLY THIS VIEW)
@@ -3586,24 +3622,8 @@ main_tab = st.radio("", ["Create New Table", "Published Tables"], horizontal=Tru
 if main_tab == "Published Tables":
     st.markdown("### Published Tables")
     st.caption("All published tables found in GitHub Pages across repos.")
-        # ✅ Who are you? (needed so "Edit" permissions work in this tab)
-    allowed_users = list(PUBLISH_USERS)
-    created_by_options = ["Select a user..."] + allowed_users
-
-    st.session_state.setdefault("bt_created_by_user_select", "Select a user...")
-
-    created_by_input_pub = st.selectbox(
-        "Created by (so Edit works)",
-        options=created_by_options,
-        key="bt_created_by_user_select",
-    )
-
-    created_by_user_pub = ""
-    if created_by_input_pub and created_by_input_pub != "Select a user...":
-        created_by_user_pub = created_by_input_pub.strip().lower()
-
-    # ✅ store globally (used by can_edit logic)
-    st.session_state["bt_created_by_user"] = created_by_user_pub
+    # ✅ Current user (from the global selector above)
+    current_user = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
 
     # ✅ Ensure filter keys exist (prevents weird state issues)
     st.session_state.setdefault("pub_brand_filter", "All")
@@ -4133,29 +4153,9 @@ if main_tab == "Published Tables":
 if main_tab == "Create New Table":
 
     # =========================================================
-    # ✅ Global "Created by" (mandatory before upload)
+    # ✅ "Created by" comes from the global selector above
     # =========================================================
-    allowed_users = list(PUBLISH_USERS)
-    created_by_options = ["Select a user..."] + allowed_users
-
-    st.session_state.setdefault("bt_created_by_user_select", "Select a user...")
-
-    created_by_input_global = st.selectbox(
-    "Created by (tracking only)",
-    options=created_by_options,
-    key="bt_created_by_user_select",
-    )
-
-    created_by_user_global = ""
-    if created_by_input_global and created_by_input_global != "Select a user...":
-        created_by_user_global = created_by_input_global.strip().lower()
-
-    # In edit-from-bundle mode, keep existing created_by when dropdown is placeholder
-    if st.session_state.get("bt_editing_from_bundle", False) and not created_by_user_global:
-        created_by_user_global = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
-
-    # store globally (used later in Publish tab)
-    st.session_state["bt_created_by_user"] = created_by_user_global
+    created_by_user_global = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
 
     # =========================================================
     # ✅ Upload CSV (disabled until "Created by" selected)
