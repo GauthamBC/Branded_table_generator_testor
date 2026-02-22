@@ -608,6 +608,105 @@ def update_widget_registry(
         branch=branch,
     )
     
+
+# =========================================================
+# ✅ GLOBAL "ACTIVE USER" (shared across browsers)
+# - Writes a small JSON file (active_user.json) to a canonical repo
+# - All sessions read it and display who last logged in / is active
+# =========================================================
+
+ACTIVE_USER_PATH = "active_user.json"
+ACTIVE_USER_TTL_MINUTES = int(get_secret("ACTIVE_USER_TTL_MINUTES", 45) or 45)
+
+def _is_generator_repo_name(repo_name: str) -> bool:
+    """True if repo name matches our generator repo naming scheme."""
+    name = (repo_name or "").strip()
+    if not name:
+        return False
+    # Brand prefix + 't' + month code + 2-digit year (e.g., ActionNetworktj26)
+    prefix_ok = any(name.startswith(pfx) for pfx in BRAND_REPO_PREFIX_FULL.values())
+    if not prefix_ok:
+        return False
+    return re.search(r"t[a-z]{1,2}\d{2}$", name.lower()) is not None
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_active_state_repo(owner: str, token: str) -> str:
+    """Pick a canonical repo to store active_user.json.
+    Priority:
+      1) secrets.ACTIVE_STATE_REPO (if set)
+      2) newest-looking generator repo under the owner (fallback)
+    """
+    preferred = str(get_secret("ACTIVE_STATE_REPO", "") or "").strip()
+    if preferred:
+        return preferred
+
+    repos = list_repos_for_owner(owner, token) or []
+    gen = [r for r in repos if _is_generator_repo_name(r)]
+    if not gen:
+        return ""
+    # Choose a stable deterministic repo (sorted descending)
+    gen_sorted = sorted(gen, reverse=True)
+    return gen_sorted[0]
+
+def utc_now_iso() -> str:
+    return datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+def _parse_iso_z(s: str) -> datetime.datetime | None:
+    try:
+        if not s:
+            return None
+        s = str(s).strip()
+        if s.endswith("Z"):
+            s = s[:-1]
+        return datetime.datetime.fromisoformat(s)
+    except Exception:
+        return None
+
+def read_active_user_state(owner: str, token: str) -> dict:
+    repo = get_active_state_repo(owner, token)
+    if not repo:
+        return {}
+    try:
+        return read_github_json(owner, repo, token, ACTIVE_USER_PATH) or {}
+    except Exception:
+        return {}
+
+def write_active_user_state(owner: str, token: str, user: str, action: str = "login") -> bool:
+    repo = get_active_state_repo(owner, token)
+    if not repo:
+        return False
+    now = datetime.datetime.utcnow().replace(microsecond=0)
+    payload = {
+        "user": (user or "").strip().lower(),
+        "action": action,
+        "utc": now.isoformat() + "Z",
+        "expires_utc": (now + datetime.timedelta(minutes=ACTIVE_USER_TTL_MINUTES)).isoformat() + "Z",
+        "app": "Branded Table Generator",
+    }
+    try:
+        write_github_json(owner, repo, token, ACTIVE_USER_PATH, payload, commit_message=f"Update active user: {payload['user']} ({action})")
+        return True
+    except Exception:
+        return False
+
+def format_relative_minutes(utc_iso_z: str) -> str:
+    dt = _parse_iso_z(utc_iso_z)
+    if not dt:
+        return ""
+    now = datetime.datetime.utcnow()
+    mins = int((now - dt).total_seconds() // 60)
+    if mins <= 0:
+        return "just now"
+    if mins == 1:
+        return "1 min ago"
+    if mins < 60:
+        return f"{mins} mins ago"
+    hrs = mins // 60
+    if hrs == 1:
+        return "1 hr ago"
+    return f"{hrs} hrs ago"
+
+
 def get_github_file_sha(owner: str, repo: str, token: str, path: str, branch: str = "main") -> str:
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
@@ -3600,6 +3699,27 @@ st.markdown(
 
 st.title("Branded Table Generator")
 
+# ✅ Global active-user banner (shared across browsers)
+try:
+    _active = read_active_user_state(PUBLISH_OWNER, github_token())
+    _active_user = str((_active or {}).get("user", "") or "").strip()
+    _active_utc = str((_active or {}).get("utc", "") or "").strip()
+    _expires = str((_active or {}).get("expires_utc", "") or "").strip()
+
+    _expired = False
+    _exp_dt = _parse_iso_z(_expires)
+    if _exp_dt and datetime.datetime.utcnow() > _exp_dt:
+        _expired = True
+
+    if _active_user and not _expired:
+        st.info(f"🟢 **Active user:** `{_active_user}` · updated {format_relative_minutes(_active_utc)}", icon=None)
+    else:
+        st.caption("No active user is currently marked as online.")
+except Exception:
+    st.caption("")
+
+
+
 # =========================================================
 # ✅ GLOBAL LOGIN (shared across both tabs)
 # =========================================================
@@ -3704,6 +3824,9 @@ with c_logout:
     )
 
 if logout_clicked:
+    _u = (st.session_state.get("bt_logged_in_user") or "").strip().lower()
+    if _u:
+        write_active_user_state(PUBLISH_OWNER, github_token(), _u, action="logout")
     st.session_state["bt_is_logged_in"] = False
     st.session_state["bt_logged_in_user"] = ""
     st.session_state.pop("bt_user_passcode", None)
@@ -3719,6 +3842,7 @@ if login_clicked:
         st.session_state["bt_is_logged_in"] = True
         st.session_state["bt_logged_in_user"] = selected_user
         st.success(f"Logged in as **{selected_user}**.")
+        write_active_user_state(PUBLISH_OWNER, github_token(), selected_user, action="login")
         st.rerun()
 
 with c_status:
