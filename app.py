@@ -4020,26 +4020,26 @@ if main_tab == "Published Tables":
                                 st.link_button("🔗 Open live page", url, use_container_width=True)
             
                             with c2:
-                            if not can_edit:
-                                owner_name = row_created_by or "someone else"
-                                st.button(f"✏️ Edit {owner_name}'s table", disabled=True, use_container_width=True)
+                                if not can_edit:
+                                    owner_name = row_created_by or "someone else"
+                                    st.button(f"✏️ Edit {owner_name}'s table", disabled=True, use_container_width=True)
 
-                                notice_html = f'''
-                                <div style="
-                                  margin-top: 10px;
-                                  padding: 10px 12px;
-                                  border-radius: 10px;
-                                  background: rgba(255, 193, 7, 0.16);
-                                  border: 1px solid rgba(255, 193, 7, 0.45);
-                                  color: #7a4b00;
-                                  font-size: 13px;
-                                  line-height: 1.25;
-                                  text-align: left;
-                                ">
-                                  <strong>Note:</strong> Only <strong>{owner_name}</strong> can edit this table.
-                                </div>
-                                '''
-                            else:
+                                    notice_html = f'''
+                                    <div style="
+                                      margin-top: 10px;
+                                      padding: 10px 12px;
+                                      border-radius: 10px;
+                                      background: rgba(255, 193, 7, 0.16);
+                                      border: 1px solid rgba(255, 193, 7, 0.45);
+                                      color: #7a4b00;
+                                      font-size: 13px;
+                                      line-height: 1.25;
+                                      text-align: left;
+                                    ">
+                                      <strong>Note:</strong> Only <strong>{owner_name}</strong> can edit this table.
+                                    </div>
+                                    '''
+                                else:
                                     has_csv = (row.get("Has CSV") == "✅")
 
                                     if not has_csv:
@@ -4053,11 +4053,11 @@ if main_tab == "Published Tables":
                                         ):
                                             # ✅ jump to editor tab first, otherwise rerun stays on Published Tables
                                             st.session_state["main_tab"] = "Create New Table"
-                                        
+
                                             # ✅ prevent the preview from re-opening on rerun
                                             st.session_state["pub_last_preview_url"] = ""
                                             st.session_state.pop("pub_table_click_df", None)
-                                        
+
                                             # ✅ load the bundle (this already calls st.rerun())
                                             bundle_path = f"bundles/{selected_file}.json"
                                             bundle_probe = read_github_json(publish_owner, selected_repo, token_to_use, bundle_path, branch="main")
@@ -4065,7 +4065,6 @@ if main_tab == "Published Tables":
                                                 st.error(f"Bundle not found at {bundle_path}. Cannot restore full table settings.")
                                                 st.stop()
                                             load_bundle_into_editor(publish_owner, selected_repo, token_to_use, selected_file)
-                                                    
                             with c3:
                                 if st.button(
                                     "🗑️ Delete this table",
