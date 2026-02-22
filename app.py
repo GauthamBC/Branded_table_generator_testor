@@ -32,6 +32,73 @@ def http_session() -> requests.Session:
     s.mount("http://", adapter)
     return s
 
+
+
+def style_radio_as_tabs(
+    radio_key: str,
+    active_bg: str = "rgba(0, 200, 83, 0.18)",
+    active_border: str = "rgba(0, 200, 83, 0.55)",
+):
+    """Style a specific st.radio (by key) to visually render like segmented tabs.
+    Keeps the underlying st.radio functionality unchanged.
+    """
+    st.markdown(
+        f"""
+        <style>
+          /* Turn radio group into segmented tabs */
+          label[data-baseweb="radio"]:has(input[name="{radio_key}"]) input[name="{radio_key}"] {{
+            display: none !important;
+          }}
+
+          label[data-baseweb="radio"]:has(input[name="{radio_key}"]) input[name="{radio_key}"] + div {{
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px 18px !important;
+            border: 1px solid rgba(0,0,0,0.10) !important;
+            background: rgba(0,0,0,0.04) !important;
+            font-weight: 650 !important;
+          }}
+
+          div[role="radiogroup"]:has(input[name="{radio_key}"]) {{
+            display: flex !important;
+            gap: 0 !important;
+            width: 100% !important;
+          }}
+
+          div[role="radiogroup"]:has(input[name="{radio_key}"]) > label[data-baseweb="radio"] {{
+            flex: 1 1 0 !important;
+            margin-right: 0 !important;
+          }}
+
+          /* Active tab */
+          label[data-baseweb="radio"]:has(input[name="{radio_key}"]) input[name="{radio_key}"]:checked + div {{
+            background: {active_bg} !important;
+            border-color: {active_border} !important;
+            color: #0b1f16 !important;
+          }}
+
+          /* Rounded ends */
+          div[role="radiogroup"]:has(input[name="{radio_key}"]) > label[data-baseweb="radio"]:first-child input[name="{radio_key}"] + div {{
+            border-top-left-radius: 12px !important;
+            border-bottom-left-radius: 12px !important;
+          }}
+          div[role="radiogroup"]:has(input[name="{radio_key}"]) > label[data-baseweb="radio"]:last-child input[name="{radio_key}"] + div {{
+            border-top-right-radius: 12px !important;
+            border-bottom-right-radius: 12px !important;
+          }}
+
+          /* Remove double borders between segments */
+          div[role="radiogroup"]:has(input[name="{radio_key}"]) > label[data-baseweb="radio"]:not(:first-child) input[name="{radio_key}"] + div {{
+            border-left: 0 !important;
+          }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 # =========================================================
 # 0) Publishing Users + Secrets (GITHUB APP)
 # =========================================================
@@ -5750,66 +5817,3 @@ if main_tab == "Create New Table":
                     preview_slot.empty()
 
 
-def style_radio_as_tabs(
-    radio_key: str,
-    active_bg: str = "rgba(0, 200, 83, 0.18)",
-    active_border: str = "rgba(0, 200, 83, 0.55)",
-):
-    """Style a specific st.radio (by key) to visually render like segmented tabs.
-    Keeps the underlying st.radio functionality unchanged.
-    """
-    st.markdown(
-        f"""
-        <style>
-          /* Turn radio group into segmented tabs */
-          label[data-baseweb="radio"]:has(input[name="{radio_key}"]) input[name="{radio_key}"] {{
-            display: none !important;
-          }}
-
-          label[data-baseweb="radio"]:has(input[name="{radio_key}"]) input[name="{radio_key}"] + div {{
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 10px 18px !important;
-            border: 1px solid rgba(0,0,0,0.10) !important;
-            background: rgba(0,0,0,0.04) !important;
-            font-weight: 650 !important;
-          }}
-
-          div[role="radiogroup"]:has(input[name="{radio_key}"]) {{
-            display: flex !important;
-            gap: 0 !important;
-            width: 100% !important;
-          }}
-
-          div[role="radiogroup"]:has(input[name="{radio_key}"]) > label[data-baseweb="radio"] {{
-            flex: 1 1 0 !important;
-            margin-right: 0 !important;
-          }}
-
-          /* Active tab */
-          label[data-baseweb="radio"]:has(input[name="{radio_key}"]) input[name="{radio_key}"]:checked + div {{
-            background: {active_bg} !important;
-            border-color: {active_border} !important;
-            color: #0b1f16 !important;
-          }}
-
-          /* Rounded ends */
-          div[role="radiogroup"]:has(input[name="{radio_key}"]) > label[data-baseweb="radio"]:first-child input[name="{radio_key}"] + div {{
-            border-top-left-radius: 12px !important;
-            border-bottom-left-radius: 12px !important;
-          }}
-          div[role="radiogroup"]:has(input[name="{radio_key}"]) > label[data-baseweb="radio"]:last-child input[name="{radio_key}"] + div {{
-            border-top-right-radius: 12px !important;
-            border-bottom-right-radius: 12px !important;
-          }}
-
-          /* Remove double borders between segments */
-          div[role="radiogroup"]:has(input[name="{radio_key}"]) > label[data-baseweb="radio"]:not(:first-child) input[name="{radio_key}"] + div {{
-            border-left: 0 !important;
-          }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
