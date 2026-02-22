@@ -4055,6 +4055,61 @@ st.session_state["bt_created_by_user"] = st.session_state.get("bt_logged_in_user
 # =========================================================
 # Main tabs
 # =========================================================
+st.markdown(
+    """
+    <style>
+      /* Main app tabs (Create New Table / Published Tables) */
+      label[data-baseweb="radio"]:has(input[name="main_tab"]) input[name="main_tab"] { display: none !important; }
+
+      /* Make each option look like a tab */
+      label[data-baseweb="radio"]:has(input[name="main_tab"]) input[name="main_tab"] + div{
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 10px 18px !important;
+        border: 1px solid rgba(0,0,0,0.10) !important;
+        background: rgba(0,0,0,0.04) !important;
+        font-weight: 650 !important;
+      }
+
+      /* Container becomes a segmented control */
+      div[role="radiogroup"]:has(input[name="main_tab"]){
+        display: flex !important;
+        gap: 0 !important;
+        width: 100% !important;
+      }
+      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]{
+        flex: 1 1 0 !important;
+        margin-right: 0 !important;
+      }
+
+      /* Active tab */
+      label[data-baseweb="radio"]:has(input[name="main_tab"]) input[name="main_tab"]:checked + div{
+        background: rgba(0, 200, 83, 0.18) !important;
+        border-color: rgba(0, 200, 83, 0.55) !important;
+        color: #0b1f16 !important;
+      }
+
+      /* Rounded ends */
+      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]:first-child input[name="main_tab"] + div{
+        border-top-left-radius: 12px !important;
+        border-bottom-left-radius: 12px !important;
+      }
+      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]:last-child input[name="main_tab"] + div{
+        border-top-right-radius: 12px !important;
+        border-bottom-right-radius: 12px !important;
+      }
+
+      /* Remove double borders between segments */
+      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]:not(:first-child) input[name="main_tab"] + div{
+        border-left: 0 !important;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.session_state.setdefault("main_tab", "Create New Table")
 main_tab = st.radio(
     "",
