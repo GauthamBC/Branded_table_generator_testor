@@ -109,6 +109,20 @@ def github_headers(token: str) -> dict:
     return headers
 
 
+def github_token(owner: str | None = None) -> str:
+    """Return a GitHub token to use for writes/reads.
+
+    Prefers GITHUB_PAT (if present), otherwise falls back to a GitHub App installation token
+    for the configured PUBLISH_OWNER (or the provided owner).
+    """
+    use_owner = (owner or PUBLISH_OWNER or "").strip().lower()
+    if GITHUB_PAT:
+        return str(GITHUB_PAT).strip()
+    try:
+        return get_installation_token_for_user(use_owner)
+    except Exception:
+        return ""
+
 def build_github_app_jwt(app_id: str, private_key_pem: str) -> str:
     """
     Create a short-lived JWT for GitHub App authentication.
