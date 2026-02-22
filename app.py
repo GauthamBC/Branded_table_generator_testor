@@ -4055,57 +4055,57 @@ st.session_state["bt_created_by_user"] = st.session_state.get("bt_logged_in_user
 # =========================================================
 # Main tabs
 # =========================================================
+# Main tabs (Create New Table / Published Tables) — styled like tabs
+# =========================================================
 st.markdown(
     """
     <style>
-      /* Main app tabs (Create New Table / Published Tables) */
-      label[data-baseweb="radio"]:has(input[name="main_tab"]) input[name="main_tab"] { display: none !important; }
+      /* Scope styles ONLY to this wrapper */
+      .bt-main-tabs [data-testid="stRadio"] { margin-top: 0.25rem; }
 
-      /* Make each option look like a tab */
-      label[data-baseweb="radio"]:has(input[name="main_tab"]) input[name="main_tab"] + div{
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"]{
+        display:flex !important;
+        flex-direction:row !important;
+        gap:0 !important;
+        width:100% !important;
+        border: 1px solid rgba(0,0,0,0.10);
+        border-radius: 12px;
+        overflow:hidden;
+        background: rgba(0,0,0,0.04);
+      }
+
+      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label{
+        flex:1 1 0 !important;
+        margin:0 !important;
+        padding:0 !important;
+      }
+
+      /* Hide the radio circle */
+      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child{
+        display:none !important;
+      }
+
+      /* Make the label look like a tab */
+      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label > div:last-child{
+        width:100% !important;
+        display:flex !important;
+        justify-content:center !important;
+        align-items:center !important;
         padding: 10px 18px !important;
-        border: 1px solid rgba(0,0,0,0.10) !important;
-        background: rgba(0,0,0,0.04) !important;
         font-weight: 650 !important;
+        border-right: 1px solid rgba(0,0,0,0.10);
+      }
+      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label:last-child > div:last-child{
+        border-right: 0 !important;
       }
 
-      /* Container becomes a segmented control */
-      div[role="radiogroup"]:has(input[name="main_tab"]){
-        display: flex !important;
-        gap: 0 !important;
-        width: 100% !important;
-      }
-      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]{
-        flex: 1 1 0 !important;
-        margin-right: 0 !important;
-      }
-
-      /* Active tab */
-      label[data-baseweb="radio"]:has(input[name="main_tab"]) input[name="main_tab"]:checked + div{
+      /* Active tab (BaseWeb usually sets data-checked="true" on the label) */
+      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] > div:last-child{
         background: rgba(0, 200, 83, 0.18) !important;
-        border-color: rgba(0, 200, 83, 0.55) !important;
         color: #0b1f16 !important;
       }
-
-      /* Rounded ends */
-      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]:first-child input[name="main_tab"] + div{
-        border-top-left-radius: 12px !important;
-        border-bottom-left-radius: 12px !important;
-      }
-      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]:last-child input[name="main_tab"] + div{
-        border-top-right-radius: 12px !important;
-        border-bottom-right-radius: 12px !important;
-      }
-
-      /* Remove double borders between segments */
-      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]:not(:first-child) input[name="main_tab"] + div{
-        border-left: 0 !important;
-      }
     </style>
+    <div class="bt-main-tabs">
     """,
     unsafe_allow_html=True,
 )
@@ -4118,6 +4118,8 @@ main_tab = st.radio(
     key="main_tab",
     label_visibility="collapsed",
 )
+
+st.markdown("""</div>""", unsafe_allow_html=True)
 
 # =========================================================
 # ✅ TAB 2: Published Tables  (ONLY THIS VIEW)
