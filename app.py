@@ -4010,23 +4010,41 @@ if main_tab == "Published Tables":
                         @st.dialog("Table Preview", width="large")
                         def preview_dialog(url):
                             st.markdown(f"**Previewing:** {url}")
-            
+
+                            # ✅ left-aligned notice strip (used when table is not editable / legacy)
+                            notice_html = ""
+
                             c1, c2, c3 = st.columns(3)
             
                             with c1:
                                 st.link_button("🔗 Open live page", url, use_container_width=True)
             
                             with c2:
-                                if not can_edit:
-                                    owner_name = row_created_by or "someone else"
-                                    st.button(f"✏️ Edit {owner_name}'s table", disabled=True, use_container_width=True)
-                                    st.caption(f"Only {owner_name} can edit this table.")
-                                else:
+                            if not can_edit:
+                                owner_name = row_created_by or "someone else"
+                                st.button(f"✏️ Edit {owner_name}'s table", disabled=True, use_container_width=True)
+
+                                notice_html = f'''
+                                <div style="
+                                  margin-top: 10px;
+                                  padding: 10px 12px;
+                                  border-radius: 10px;
+                                  background: rgba(255, 193, 7, 0.16);
+                                  border: 1px solid rgba(255, 193, 7, 0.45);
+                                  color: #7a4b00;
+                                  font-size: 13px;
+                                  line-height: 1.25;
+                                  text-align: left;
+                                ">
+                                  <strong>Note:</strong> Only <strong>{owner_name}</strong> can edit this table.
+                                </div>
+                                '''
+                            else:
                                     has_csv = (row.get("Has CSV") == "✅")
 
                                     if not has_csv:
                                         st.button("✏️ Edit this table", disabled=True, use_container_width=True)
-                                        st.caption("Legacy table (no editable bundle). Re-publish once from Create New Table to enable full edit restore.")
+                                        notice_html = '''<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(59,130,246,0.10);border:1px solid rgba(59,130,246,0.25);color:#1f3a8a;font-size:13px;line-height:1.25;text-align:left;"><strong>Note:</strong> Legacy table (no editable bundle). Re-publish once from <strong>Create New Table</strong> to enable full edit restore.</div>'''
                                     else:
                                         if st.button(
                                             "✏️ Edit this table",
@@ -4073,7 +4091,10 @@ if main_tab == "Published Tables":
                                     st.session_state.pop("pub_table_click_df", None)
             
                                     st.rerun()
-            
+
+                            if notice_html:
+                                st.markdown(notice_html, unsafe_allow_html=True)
+
                             components.iframe(url, height=650, scrolling=True)
             
                         preview_dialog(selected_url)
