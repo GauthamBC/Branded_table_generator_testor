@@ -841,30 +841,46 @@ def remove_active_user(owner: str, token: str, user: str) -> bool:
 
 
 def render_active_users_banner(owner: str, token: str):
-    """Display a top-of-app banner listing currently active users."""
-    repo = get_active_state_repo(owner, token)
-    if not repo or not active_state_repo_exists(owner, repo, token):
-        st.warning("Active-user state repo not found or not accessible. Set ACTIVE_STATE_REPO in secrets (e.g., BrandedGeneratorState).")
-        return
-    state = read_active_users_state(owner, token)
-    if not state:
-        st.info("No active users detected (last ~{} mins).".format(ACTIVE_USER_TTL_MINUTES))
-        return
+    """Collapsible 'Active users' panel (global, shared across sessions).
 
-    # sort by last seen (utc desc)
-    def _key(item):
-        meta = item[1] or {}
-        dt = _parse_iso_z(meta.get("utc", "")) or datetime.datetime.min
-        return dt
+    This is intentionally NOT always visible as a big banner — it lives in an expander
+    so only interested users open it.
+    """
+    with st.expander("🟢 Active users", expanded=False):
+        try:
+            repo = get_active_state_repo(owner, token)
+            if not repo or not active_state_repo_exists(owner, repo, token):
+                st.warning(
+                    "Active-user state repo not found or not accessible. "
+                    "Set ACTIVE_STATE_REPO in secrets (e.g., BrandedGeneratorState)."
+                )
+                return
 
-    items = sorted(state.items(), key=_key, reverse=True)
+            state = read_active_users_state(owner, token)
+            if not state:
+                st.caption(f"No active users detected (last ~{ACTIVE_USER_TTL_MINUTES} mins).")
+                return
 
-    chips = []
-    for u, meta in items:
-        rel = format_relative_minutes((meta or {}).get("utc", ""))
-        chips.append(f"**{u}** ({rel})")
+            # sort by last seen (utc desc)
+            def _key(item):
+                meta = item[1] or {}
+                dt = _parse_iso_z(meta.get("utc", "")) or datetime.datetime.min
+                return dt
 
-    st.success("🟢 Active users: " + " · ".join(chips))
+            items = sorted(state.items(), key=_key, reverse=True)
+
+            # Friendly list
+            for u, meta in items:
+                rel = format_relative_minutes((meta or {}).get("utc", ""))
+                st.markdown(f"- **{u}** — {rel}")
+
+            st.caption(
+                f"Auto-removes users after ~{ACTIVE_USER_TTL_MINUTES} minutes without a heartbeat."
+            )
+        except Exception as e:
+            # Keep this non-fatal and non-spammy
+            st.warning("Could not load active-user state right now.")
+
 
 def get_github_file_sha(owner: str, repo: str, token: str, path: str, branch: str = "main") -> str:
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
