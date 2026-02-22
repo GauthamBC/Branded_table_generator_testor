@@ -3057,7 +3057,7 @@ def load_bundle_into_editor(owner: str, repo: str, token: str, widget_file_name:
 
     created_by = (bundle.get("created_by", "") or "").strip().lower()
     st.session_state["bt_created_by_user"] = created_by
-    st.session_state["bt_created_by_user_select"] = created_by or "Select a user..."
+    st.session_state["bt_user_select"] = created_by or "Select a user..."
 
     cfg = bundle.get("config") or {}
 
@@ -3601,30 +3601,135 @@ st.markdown(
 st.title("Branded Table Generator")
 
 # =========================================================
-# ✅ GLOBAL "WHO ARE YOU?" (shared across both tabs)
+# ✅ GLOBAL LOGIN (shared across both tabs)
 # =========================================================
 allowed_users = list(PUBLISH_USERS)
 created_by_options = ["Select a user..."] + allowed_users
 
-# one shared dropdown state
-st.session_state.setdefault("bt_created_by_user_select", "Select a user...")
-st.session_state.setdefault("bt_created_by_user", "")
+def _get_user_passcodes() -> dict:
+    """Read per-user 6-digit passcodes from Streamlit secrets."""
+    out = {}
+    try:
+        raw = st.secrets.get("USER_PASSCODES", {})
+        if isinstance(raw, Mapping):
+            out = {str(k).strip().lower(): str(v).strip() for k, v in raw.items() if str(k).strip()}
+        elif isinstance(raw, str) and raw.strip():
+            # allow JSON string in secrets if needed
+            try:
+                obj = json.loads(raw)
+                if isinstance(obj, dict):
+                    out = {str(k).strip().lower(): str(v).strip() for k, v in obj.items() if str(k).strip()}
+            except Exception:
+                pass
+    except Exception:
+        pass
 
+    # fallback: PASSCODE_<USER> keys (optional)
+    for u in allowed_users:
+        k = f"PASSCODE_{u.upper()}"
+        try:
+            v = st.secrets.get(k, "")
+        except Exception:
+            v = ""
+        if v:
+            out.setdefault(u.lower(), str(v).strip())
+
+    # keep only allowed users + sane 6-digit codes
+    cleaned = {}
+    for u in allowed_users:
+        code = (out.get(u.lower(), "") or "").strip()
+        if re.fullmatch(r"\d{6}", code or ""):
+            cleaned[u.lower()] = code
+    return cleaned
+
+def _validate_passcode(user: str, entered: str) -> bool:
+    user = (user or "").strip().lower()
+    entered = (entered or "").strip()
+    codes = _get_user_passcodes()
+    expected = codes.get(user, "")
+    if not expected:
+        return False
+    # constant-time compare
+    return hmac.compare_digest(entered, expected)
+
+st.session_state.setdefault("bt_user_select", "Select a user...")
+st.session_state.setdefault("bt_logged_in_user", "")
+st.session_state.setdefault("bt_is_logged_in", False)
+
+# user dropdown (login target)
 created_by_choice = st.selectbox(
     "Created by (tracking only)",
     options=created_by_options,
-    key="bt_created_by_user_select",
+    key="bt_user_select",
 )
 
-chosen_user = ""
+selected_user = ""
 if created_by_choice and created_by_choice != "Select a user...":
-    chosen_user = created_by_choice.strip().lower()
+    selected_user = created_by_choice.strip().lower()
 
-# If we're editing a restored bundle, allow placeholder to keep the bundle's created_by
-if st.session_state.get("bt_editing_from_bundle", False) and not chosen_user:
-    chosen_user = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
+# If dropdown changed away from the logged-in user, log out (prevents accidental cross-user edits)
+if st.session_state.get("bt_is_logged_in") and selected_user and selected_user != st.session_state.get("bt_logged_in_user", ""):
+    st.session_state["bt_is_logged_in"] = False
+    st.session_state["bt_logged_in_user"] = ""
+    st.session_state.pop("bt_user_passcode", None)
 
-st.session_state["bt_created_by_user"] = chosen_user
+# passcode input + login/logout
+pass_disabled = (not selected_user)
+st.text_input(
+    "6-digit passcode",
+    type="password",
+    max_chars=6,
+    key="bt_user_passcode",
+    disabled=pass_disabled,
+    help="Enter your 6-digit passcode to enable publishing/editing as this user.",
+)
+
+c_login, c_logout, c_status = st.columns([1, 1, 4])
+
+with c_login:
+    login_clicked = st.button(
+        "Log in",
+        disabled=pass_disabled or not (st.session_state.get("bt_user_passcode") or "").strip(),
+        type="primary",
+        use_container_width=True,
+        key="bt_login_btn",
+    )
+
+with c_logout:
+    logout_clicked = st.button(
+        "Log out",
+        disabled=not st.session_state.get("bt_is_logged_in", False),
+        use_container_width=True,
+        key="bt_logout_btn",
+    )
+
+if logout_clicked:
+    st.session_state["bt_is_logged_in"] = False
+    st.session_state["bt_logged_in_user"] = ""
+    st.session_state.pop("bt_user_passcode", None)
+    st.rerun()
+
+if login_clicked:
+    entered = (st.session_state.get("bt_user_passcode") or "").strip()
+    if not re.fullmatch(r"\d{6}", entered):
+        st.error("Passcode must be exactly **6 digits**.")
+    elif not _validate_passcode(selected_user, entered):
+        st.error("Wrong passcode.")
+    else:
+        st.session_state["bt_is_logged_in"] = True
+        st.session_state["bt_logged_in_user"] = selected_user
+        st.success(f"Logged in as **{selected_user}**.")
+        st.rerun()
+
+with c_status:
+    if st.session_state.get("bt_is_logged_in", False):
+        st.markdown(f"✅ **Logged in as:** `{st.session_state.get('bt_logged_in_user','')}`")
+    else:
+        st.caption("Not logged in. You can browse published tables, but publishing/editing requires login.")
+
+# ✅ This is the ONLY identity used for tracking + permissions
+st.session_state.setdefault("bt_created_by_user", "")
+st.session_state["bt_created_by_user"] = st.session_state.get("bt_logged_in_user", "") if st.session_state.get("bt_is_logged_in", False) else ""
 
 # =========================================================
 # Main tabs
