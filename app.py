@@ -10,6 +10,74 @@ import io
 import json
 from collections.abc import Mapping
 
+def style_radio_as_big_tabs(
+    radio_key: str,
+    height_px: int = 58,
+    radius_px: int = 0,
+    font_px: int = 20,
+    active_bg: str = "#00C853",
+    active_fg: str = "white",
+    inactive_bg: str = "#E7F6EE",
+    inactive_fg: str = "#0b1f16",
+    border: str = "1px solid rgba(0,0,0,0.10)",
+):
+    """Style a Streamlit st.radio (by key) to render like full-width segmented tabs.
+    Keeps the underlying st.radio functionality unchanged.
+    """
+    st.markdown(
+        f"""
+        <style>
+        /* Hide actual radio circles */
+        label[data-baseweb="radio"]:has(input[name="{radio_key}"]) input[name="{radio_key}"] {{
+            display: none !important;
+        }}
+
+        /* Make the group a full-width segmented bar */
+        div[role="radiogroup"]:has(input[name="{radio_key}"]) {{
+            display: flex !important;
+            width: 100% !important;
+            gap: 0 !important;
+        }}
+
+        /* Each option is equal width */
+        div[role="radiogroup"]:has(input[name="{radio_key}"]) > label[data-baseweb="radio"] {{
+            flex: 1 1 0 !important;
+            margin-right: 0 !important;
+        }}
+
+        /* The clickable “tab button” */
+        label[data-baseweb="radio"]:has(input[name="{radio_key}"]) input[name="{radio_key}"] + div {{
+            width: 100% !important;
+            height: {height_px}px !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 0 18px !important;
+
+            border: {border} !important;
+            background: {inactive_bg} !important;
+            color: {inactive_fg} !important;
+            font-weight: 700 !important;
+            font-size: {font_px}px !important;
+            border-radius: {radius_px}px !important;
+        }}
+
+        /* Active tab */
+        label[data-baseweb="radio"]:has(input[name="{radio_key}"]) input[name="{radio_key}"]:checked + div {{
+            background: {active_bg} !important;
+            color: {active_fg} !important;
+        }}
+
+        /* Remove double border between segments */
+        div[role="radiogroup"]:has(input[name="{radio_key}"]) > label[data-baseweb="radio"]:not(:first-child) input[name="{radio_key}"] + div {{
+            border-left: 0 !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 import jwt  # ✅ PyJWT
 import pandas as pd
 import requests
@@ -4122,60 +4190,7 @@ st.session_state["bt_created_by_user"] = st.session_state.get("bt_logged_in_user
 # =========================================================
 # Main tabs
 # =========================================================
-st.markdown(
-    """
-    <style>
-      /* Main app tabs (Create New Table / Published Tables) */
-      label[data-baseweb="radio"]:has(input[name="main_tab"]) input[name="main_tab"] { display: none !important; }
-
-      /* Make each option look like a tab */
-      label[data-baseweb="radio"]:has(input[name="main_tab"]) input[name="main_tab"] + div{
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 10px 18px !important;
-        border: 1px solid rgba(0,0,0,0.10) !important;
-        background: rgba(0,0,0,0.04) !important;
-        font-weight: 650 !important;
-      }
-
-      /* Container becomes a segmented control */
-      div[role="radiogroup"]:has(input[name="main_tab"]){
-        display: flex !important;
-        gap: 0 !important;
-        width: 100% !important;
-      }
-      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]{
-        flex: 1 1 0 !important;
-        margin-right: 0 !important;
-      }
-
-      /* Active tab */
-      label[data-baseweb="radio"]:has(input[name="main_tab"]) input[name="main_tab"]:checked + div{
-        background: rgba(0, 200, 83, 0.18) !important;
-        border-color: rgba(0, 200, 83, 0.55) !important;
-        color: #0b1f16 !important;
-      }
-
-      /* Rounded ends */
-      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]:first-child input[name="main_tab"] + div{
-        border-top-left-radius: 12px !important;
-        border-bottom-left-radius: 12px !important;
-      }
-      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]:last-child input[name="main_tab"] + div{
-        border-top-right-radius: 12px !important;
-        border-bottom-right-radius: 12px !important;
-      }
-
-      /* Remove double borders between segments */
-      div[role="radiogroup"]:has(input[name="main_tab"]) > label[data-baseweb="radio"]:not(:first-child) input[name="main_tab"] + div{
-        border-left: 0 !important;
-      }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+style_radio_as_big_tabs("main_tab", height_px=60, font_px=20, radius_px=0)
 
 st.session_state.setdefault("main_tab", "Create New Table")
 main_tab = st.radio(
@@ -4834,7 +4849,7 @@ if main_tab == "Create New Table":
 
                 # ✅ Right side: Preview + Body Editor tabs
                 with right_col:
-                    style_radio_as_tabs("bt_right_view")
+                    style_radio_as_big_tabs("bt_right_view", height_px=52, font_px=18, radius_px=0)
                     right_view = st.radio(
                         "Right view",
                         ["Preview", "Edit table content (Optional)"],
@@ -4913,7 +4928,7 @@ if main_tab == "Create New Table":
 
                 # ===================== Left: Tabs =====================
                 with left_col:
-                    style_radio_as_tabs("bt_left_view")
+                    style_radio_as_big_tabs("bt_left_view", height_px=52, font_px=18, radius_px=0)
                     left_view = st.radio(
                         "Left view",
                         ["Edit table contents", "Get Embed Script"],
@@ -5711,7 +5726,7 @@ if main_tab == "Create New Table":
                                 st.link_button("🔗 Open published page", published_url_val, use_container_width=True)
 
                             # ✅ Faster than st.tabs(): only renders ONE view per rerun
-                            style_radio_as_tabs("bt_embed_view")
+                            style_radio_as_big_tabs("bt_embed_view", height_px=46, font_px=16, radius_px=0)
                             embed_view = st.radio(
                                 "Embed view",
                                 ["HTML Code", "IFrame"],
