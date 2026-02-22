@@ -4055,654 +4055,15 @@ st.session_state["bt_created_by_user"] = st.session_state.get("bt_logged_in_user
 # =========================================================
 # Main tabs
 # =========================================================
-# Main tabs (Create New Table / Published Tables) — styled like tabs
+
 # =========================================================
-st.markdown(
-    """
-    <style>
-  /* =====================================================
-     MAIN NAV (Create New Table / Published Tables)
-     - Still uses st.radio for state control
-     - Visually matches Streamlit st.tabs (50/50, pill track)
-     ===================================================== */
-
-  /* tighten spacing above the control */
-  .bt-main-tabs [data-testid="stRadio"] { margin-top: 0.25rem; }
-
-  /* Turn the radio group into a two-tab bar */
-  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"]{
-    display:flex !important;
-    flex-direction:row !important;
-    gap:0 !important;
-    width:100% !important;
-
-    border: 1px solid rgba(0,0,0,0.10);
-    border-radius: 12px;
-    overflow:hidden;
-    background: rgba(0,0,0,0.06);
-  }
-
-  /* Each option becomes a 50/50 “tab” */
-  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label{
-    flex: 1 1 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  /* Hide the actual radio control (more robust across Streamlit/BaseWeb DOM changes) */
-  .bt-main-tabs [data-testid="stRadio"] input[type="radio"]{
-    position:absolute !important;
-    opacity:0 !important;
-    pointer-events:none !important;
-    width:0 !important;
-    height:0 !important;
-  }
-
-  /* The clickable “tab” surface */
-  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label{
-    display:flex !important;
-    align-items:stretch !important;
-  }
-
-  /* BaseWeb often wraps label text in the last child div - style it as the tab */
-  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label > div:last-child{
-    width:100% !important;
-    display:flex !important;
-    justify-content:center !important;
-    align-items:center !important;
-
-    padding: 14px 12px !important;
-    font-weight: 700 !important;
-    border-right: 1px solid rgba(0,0,0,0.10);
-    background: transparent !important;
-    color: #0b1f16 !important;
-  }
-  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label:last-child > div:last-child{
-    border-right: 0 !important;
-  }
-
-  /* ACTIVE tab */
-  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] > div:last-child{
-    background: #00c853 !important;          /* strong green (match your 2nd screenshot) */
-    color: #ffffff !important;
-  }
-
-  /* Hover for inactive tabs */
-  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="false"] > div:last-child:hover{
-    background: rgba(0, 200, 83, 0.12) !important;
-  }
-</style>
-    <div class="bt-main-tabs">
-    """,
-    unsafe_allow_html=True,
-)
-
+# Main tabs (REAL st.tabs)
+# - Keeps your edit-jump working by re-ordering tabs so the
+#   desired one is first (Streamlit selects the first tab).
+# =========================================================
 st.session_state.setdefault("main_tab", "Create New Table")
-main_tab = st.radio(
-    "",
-    ["Create New Table", "Published Tables"],
-    horizontal=True,
-    key="main_tab",
-    label_visibility="collapsed",
-)
 
-st.markdown("""</div>""", unsafe_allow_html=True)
-
-# =========================================================
-# ✅ TAB 2: Published Tables  (ONLY THIS VIEW)
-# =========================================================
-if main_tab == "Published Tables":
-    st.markdown("### Published Tables")
-    st.caption("All published tables found in GitHub Pages across repos.")
-    # ✅ Current user (from the global selector above)
-    current_user = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
-
-    # ✅ Ensure filter keys exist (prevents weird state issues)
-    st.session_state.setdefault("pub_brand_filter", "All")
-    st.session_state.setdefault("pub_people_filter", "All")
-    st.session_state.setdefault("pub_month_filter", "All")
-    st.session_state.setdefault("pub_last_preview_url", "")
-
-    # ✅ Refresh button MUST live inside this tab
-    refresh_clicked = st.button(
-        "🔄 Refresh Published Tables",
-        key="pub_refresh_btn",
-        use_container_width=False,
-    )
-
-    publish_owner = (PUBLISH_OWNER or "").strip().lower()
-
-    token_to_use = ""
-    if GITHUB_PAT:
-        token_to_use = GITHUB_PAT
-    else:
-        try:
-            token_to_use = get_installation_token_for_user(publish_owner)
-        except Exception:
-            token_to_use = ""
-
-    if not publish_owner or not token_to_use:
-        st.warning("No publishing token found. Add GITHUB_PAT in secrets to view published tables.")
-    else:
-        # ✅ Only refetch when needed
-        if refresh_clicked or "df_pub_cache" not in st.session_state or "Has CSV" not in st.session_state["df_pub_cache"].columns:
-            if refresh_clicked:
-                st.cache_data.clear()
-            st.session_state["df_pub_cache"] = get_all_published_widgets(publish_owner, token_to_use)
-
-        df_pub = st.session_state.get("df_pub_cache")
-
-        if df_pub is None or df_pub.empty:
-            st.info("No published tables found yet.")
-        else:
-            # ✅ Normalize datetime once
-            df_pub = df_pub.copy()
-            df_pub["Created DT"] = pd.to_datetime(df_pub.get("Created UTC", ""), errors="coerce", utc=True)
-            
-            # ✅ Build filter options from FULL dataset
-            all_brands = sorted([b for b in df_pub["Brand"].dropna().unique() if str(b).strip()])
-            all_people = sorted([p for p in df_pub["Created By"].dropna().unique() if str(p).strip()])
-            
-            # ✅ Month filter keys + friendly labels
-            df_pub["MonthKey"] = df_pub["Created DT"].dt.strftime("%Y-%m")     # ex: 2026-01
-            df_pub["MonthLabel"] = df_pub["Created DT"].dt.strftime("%b %Y")   # ex: Jan 2026
-            
-            # ✅ map MonthKey -> MonthLabel (so selectbox can display friendly label)
-            month_label_map = (
-                df_pub.dropna(subset=["MonthKey"])
-                .drop_duplicates("MonthKey")
-                .set_index("MonthKey")["MonthLabel"]
-                .to_dict()
-            )
-            
-            all_month_keys = sorted([m for m in month_label_map.keys() if str(m).strip()], reverse=True)
-            
-            st.markdown("### Filters")
-            
-            col1, col2, col3, col4 = st.columns([1, 1, 1, 0.55])
-            
-            with col1:
-                brand_filter = st.selectbox(
-                    "Filter by brand",
-                    ["All"] + all_brands,
-                    key="pub_brand_filter",
-                )
-            
-            with col2:
-                people_filter = st.selectbox(
-                    "Filter by people",
-                    ["All"] + all_people,
-                    key="pub_people_filter",
-                )
-            
-            with col3:
-                month_filter = st.selectbox(
-                    "Filter by month",
-                    ["All"] + all_month_keys,    # ✅ store MonthKey in session_state
-                    key="pub_month_filter",
-                    format_func=lambda k: "All" if k == "All" else month_label_map.get(k, k),
-                )
-            
-            def reset_pub_filters():
-                st.session_state["pub_brand_filter"] = "All"
-                st.session_state["pub_people_filter"] = "All"
-                st.session_state["pub_month_filter"] = "All"
-                st.session_state["pub_last_preview_url"] = ""
-                st.rerun()  # <- strongly recommended so the rest of this run doesn't use stale local vars
-        
-            with col4:
-                st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                st.button(
-                    "Reset Filters",
-                    key="pub_reset_filters",
-                    use_container_width=True,
-                    on_click=reset_pub_filters,
-                )
-            # ✅ Always initialize so tab blocks never crash
-            df_view = pd.DataFrame()
-
-            # ✅ Apply filters
-            df_view = df_pub.copy()
-            
-            if brand_filter != "All":
-                df_view = df_view[df_view["Brand"] == brand_filter]
-            
-            if people_filter != "All":
-                df_view = df_view[df_view["Created By"] == people_filter]
-            
-            if month_filter != "All":
-                df_view = df_view[df_view["MonthKey"] == month_filter]
-            
-            # ✅ Optional: hide helper columns from display
-            df_view = df_view.drop(columns=["Created DT", "MonthKey", "MonthLabel"], errors="ignore")     
-
-            # ✅ If no matches
-            if df_view.empty:
-                st.warning("No results match your filters.")
-            else:
-                # ✅ Clean up any helper cols safely (no-ops if they don't exist)
-                df_view = df_view.drop(columns=["Created DT", "Month", "MonthKey", "MonthLabel"], errors="ignore")
-            
-                # ✅ Reset index once so selection rows map correctly everywhere
-                df_view = df_view.reset_index(drop=True)
-
-    # =========================================================
-    # ✅ PREVIEW + DELETE in TABS (side-by-side)
-    # =========================================================
-    st.markdown(
-        """
-        <style>
-          /* Full-width tab row */
-          div[data-baseweb="tab-list"] {
-            width: 100% !important;
-            display: flex !important;
-            gap: 0 !important;
-            background: #dff5ea !important;          /* pale green bar */
-            border-radius: 0 !important;
-            overflow: hidden !important;
-            border: 1px solid rgba(0,0,0,0.08) !important;
-          }
-    
-          /* Each tab is 50/50 */
-          button[data-baseweb="tab"] {
-            flex: 1 1 0 !important;
-            justify-content: center !important;
-            padding: 14px 12px !important;
-            font-weight: 700 !important;
-            border: none !important;
-            margin: 0 !important;
-            background: transparent !important;
-          }
-    
-          /* ACTIVE tab */
-          button[data-baseweb="tab"][aria-selected="true"] {
-            background: #00c853 !important;          /* strong green */
-            color: #ffffff !important;
-          }
-          button[data-baseweb="tab"][aria-selected="true"] * {
-            color: #ffffff !important;
-          }
-    
-          /* INACTIVE tab */
-          button[data-baseweb="tab"][aria-selected="false"] {
-            color: #0b1f16 !important;
-          }
-          button[data-baseweb="tab"][aria-selected="false"]:hover {
-            background: rgba(0, 200, 83, 0.12) !important;
-          }
-    
-          /* Remove Streamlit's default underline/highlight if present */
-          div[data-baseweb="tab-highlight"] { display: none !important; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    # ✅ Fallback safeguard before tabs
-    if "df_view" not in locals():
-        df_view = st.session_state.get("df_pub_cache", pd.DataFrame())
-        if not isinstance(df_view, pd.DataFrame):
-            df_view = pd.DataFrame()
-        
-    tab_preview_tables, tab_delete_tables = st.tabs(
-        ["Preview tables", "Delete tables (admin)"]
-    )
-    
-    # -----------------------------
-    # TAB: DELETE TABLES (ADMIN)
-    # -----------------------------
-    with tab_delete_tables:
-        st.markdown("#### Delete tables (admin)")
-    
-        delete_cols = ["Brand", "Table Name", "Has CSV", "Pages URL", "Repo", "File", "Created By", "Created UTC"]
-        df_delete = df_view.copy() if isinstance(df_view, pd.DataFrame) else pd.DataFrame()
-
-        # Make sure all required columns exist (prevents KeyError)
-        for c in delete_cols:
-            if c not in df_delete.columns:
-                df_delete[c] = ""
-    
-        df_delete = df_delete[delete_cols].reset_index(drop=True)
-    
-        # Add checkbox column (multi-select)
-        df_delete.insert(0, "Delete?", False)
-    
-        edited = st.data_editor(
-            df_delete,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="fixed",
-            column_config={
-                "Delete?": st.column_config.CheckboxColumn("Delete?", help="Tick rows you want to delete"),
-                "Pages URL": st.column_config.TextColumn("Pages URL"),
-            },
-            disabled=[c for c in df_delete.columns if c != "Delete?"],
-            key="pub_delete_editor",
-        )
-    
-        to_delete = edited[edited["Delete?"] == True].copy()
-        st.session_state["pub_to_delete"] = to_delete.to_dict("records")  # ✅ snapshot for dialog
-        delete_disabled = to_delete.empty
-    
-        c1, c2 = st.columns([1, 1])
-        with c1:
-            st.caption(f"Selected: **{len(to_delete)}**")
-    
-        with c2:
-            delete_clicked = st.button(
-                "🗑️ Delete selected",
-                disabled=delete_disabled,
-                use_container_width=True,
-                type="secondary",
-                key="pub_delete_btn",
-            )
-    
-        if delete_clicked:
-            if not hasattr(st, "dialog"):
-                st.error("Your Streamlit version doesn’t support dialogs. Update Streamlit or use an inline confirmation block.")
-            else:
-                @st.dialog("Confirm delete", width="large")
-                def confirm_delete_dialog():
-                    rows = st.session_state.get("pub_to_delete", []) or []
-                    df_del = pd.DataFrame(rows)
-    
-                    st.warning("This will permanently delete the selected HTML + bundle files from GitHub.")
-                    st.markdown("**You are deleting:**")
-    
-                    if df_del.empty:
-                        st.info("No rows selected.")
-                        return
-    
-                    st.dataframe(
-                        df_del[["Brand", "Table Name", "Repo", "File", "Created By", "Created UTC"]],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-    
-                    passkey = st.text_input("Enter admin passkey", type="password", key="pub_delete_passkey")
-                    i_understand = st.checkbox("I understand this cannot be undone", key="pub_delete_ack")
-    
-                    do_it = st.button(
-                        "✅ Confirm delete",
-                        disabled=not (passkey and i_understand),
-                        type="primary",
-                        key="pub_confirm_delete_btn",
-                    )
-    
-                    if do_it:
-                        expected = str(st.secrets.get("ADMIN_DELETE_CODE", "") or "")
-                        if not expected or not hmac.compare_digest(passkey, expected):
-                            st.error("Wrong passkey.")
-                            return
-    
-                        errors = []
-                        for _, r in df_del.iterrows():
-                            repo = (r.get("Repo") or "").strip()
-                            file = (r.get("File") or "").strip()
-    
-                            if not repo or not file:
-                                errors.append(f"Missing Repo/File for row: {r.get('Pages URL')}")
-                                continue
-    
-                            try:
-                                # delete main HTML
-                                delete_github_file(publish_owner, repo, token_to_use, file, branch="main")
-    
-                                # delete bundle written as bundles/{widget_file_name}.json (widget_file_name already ends with .html)
-                                bundle_path = f"bundles/{file}.json"
-                                delete_github_file(publish_owner, repo, token_to_use, bundle_path, branch="main")
-    
-                                # remove from widget_registry.json (recommended)
-                                remove_from_widget_registry(publish_owner, repo, token_to_use, file, branch="main")
-    
-                            except Exception as e:
-                                errors.append(f"{repo}/{file}: {e}")
-    
-                        if errors:
-                            st.error("Some deletes failed:")
-                            st.write(errors)
-                        else:
-                            st.success("Deleted successfully.")
-    
-                        # Refresh list after deletes
-                        try:
-                            st.cache_data.clear()
-                        except Exception:
-                            pass
-                        st.session_state.pop("df_pub_cache", None)
-                        st.session_state.pop("pub_to_delete", None)
-                        st.rerun()
-    
-                confirm_delete_dialog()
-    
-    # -----------------------------
-    # TAB: PREVIEW TABLES
-    # -----------------------------
-    with tab_preview_tables:
-        st.markdown("#### Click a row to preview")
-    
-        df_display = df_view.copy()
-        if "Pages URL" in df_display.columns:
-            df_display["Pages URL"] = df_display["Pages URL"].astype(str)
-        else:
-            df_display["Pages URL"] = ""
-    
-        preview_cols = ["Brand", "Table Name", "Has CSV", "Pages URL", "Created By", "Created UTC"]
-        for c in preview_cols:
-            if c not in df_display.columns:
-                df_display[c] = ""
-    
-        event = st.dataframe(
-            df_display[preview_cols],
-            use_container_width=True,
-            hide_index=True,
-            selection_mode="single-row",
-            on_select="rerun",
-            key="pub_table_click_df",
-            column_config={
-                "Pages URL": st.column_config.TextColumn("Pages URL"),
-            },
-        )
-    
-        # ✅ Extract selected row → auto-preview popup
-        selected_rows = []
-        try:
-            selected_rows = event.selection.rows or []
-        except Exception:
-            selected_rows = []
-    
-        if selected_rows:
-            selected_idx = selected_rows[0]
-            selected_url = (df_display.loc[selected_idx, "Pages URL"] or "").strip()
-    
-            # ✅ row comes from df_display to ensure index alignment
-            row = df_display.loc[selected_idx]
-    
-            selected_repo = (row.get("Repo") or "").strip()
-            selected_file = (row.get("File") or "").strip()
-    
-            row_created_by = (row.get("Created By") or "").strip().lower()
-            current_user = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
-    
-            # ✅ must pick a user in Published tab for editing
-            can_edit = bool(current_user) and ((not row_created_by) or (row_created_by == current_user))
-    
-            # ✅ If we're about to open the delete-confirm dialog, do NOT open the preview dialog too
-            if st.session_state.get("pub_open_single_delete_dialog"):
-                pass
-            else:
-                if selected_url:
-                    # ✅ Prevent re-opening popup every rerun if same row clicked again
-                    last = st.session_state.get("pub_last_preview_url", "")
-                    if selected_url != last:
-                        st.session_state["pub_last_preview_url"] = selected_url
-            
-                    # ✅ Popup modal preview (if supported)
-                    if hasattr(st, "dialog"):
-            
-                        @st.dialog("Table Preview", width="large")
-                        def preview_dialog(url):
-                            st.markdown(f"**Previewing:** {url}")
-
-                            # ✅ left-aligned notice strip (used when table is not editable / legacy)
-                            notice_html = ""
-
-                            c1, c2, c3 = st.columns(3)
-            
-                            with c1:
-                                st.link_button("🔗 Open live page", url, use_container_width=True)
-            
-                            with c2:
-                                if not can_edit:
-                                    owner_name = row_created_by or "someone else"
-                                    st.button(f"✏️ Edit {owner_name}'s table", disabled=True, use_container_width=True)
-
-                                    notice_html = f'''
-                                    <div style="
-                                      margin-top: 10px;
-                                      padding: 10px 12px;
-                                      border-radius: 10px;
-                                      background: rgba(255, 193, 7, 0.16);
-                                      border: 1px solid rgba(255, 193, 7, 0.45);
-                                      color: #7a4b00;
-                                      font-size: 13px;
-                                      line-height: 1.25;
-                                      text-align: left;
-                                    ">
-                                      <strong>Note:</strong> Only <strong>{owner_name}</strong> can edit this table.
-                                    </div>
-                                    '''
-                                else:
-                                    has_csv = (row.get("Has CSV") == "✅")
-
-                                    if not has_csv:
-                                        st.button("✏️ Edit this table", disabled=True, use_container_width=True)
-                                        notice_html = '''<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(59,130,246,0.10);border:1px solid rgba(59,130,246,0.25);color:#1f3a8a;font-size:13px;line-height:1.25;text-align:left;"><strong>Note:</strong> Legacy table (no editable bundle). Re-publish once from <strong>Create New Table</strong> to enable full edit restore.</div>'''
-                                    else:
-                                        if st.button(
-                                            "✏️ Edit this table",
-                                            key=f"pub_edit_{selected_repo}_{selected_file}",
-                                            use_container_width=True,
-                                        ):
-                                            # ✅ jump to editor tab first, otherwise rerun stays on Published Tables
-                                            st.session_state["main_tab"] = "Create New Table"
-
-                                            # ✅ prevent the preview from re-opening on rerun
-                                            st.session_state["pub_last_preview_url"] = ""
-                                            st.session_state.pop("pub_table_click_df", None)
-
-                                            # ✅ load the bundle (this already calls st.rerun())
-                                            bundle_path = f"bundles/{selected_file}.json"
-                                            bundle_probe = read_github_json(publish_owner, selected_repo, token_to_use, bundle_path, branch="main")
-                                            if not bundle_probe:
-                                                st.error(f"Bundle not found at {bundle_path}. Cannot restore full table settings.")
-                                                st.stop()
-                                            load_bundle_into_editor(publish_owner, selected_repo, token_to_use, selected_file)
-                            with c3:
-                                if st.button(
-                                    "🗑️ Delete this table",
-                                    key=f"pub_delete_single_btn_{selected_repo}_{selected_file}",
-                                    use_container_width=True,
-                                    type="secondary",
-                                ):
-                                    st.session_state["pub_single_delete_target"] = {
-                                        "Repo": selected_repo,
-                                        "File": selected_file,
-                                        "Brand": row.get("Brand", ""),
-                                        "Table Name": row.get("Table Name", ""),
-                                        "Pages URL": url,
-                                        "Created By": row_created_by,
-                                        "Created UTC": row.get("Created UTC", ""),
-                                    }
-                                    st.session_state["pub_open_single_delete_dialog"] = True
-            
-                                    # ✅ prevent the preview dialog from being re-triggered on rerun
-                                    st.session_state["pub_last_preview_url"] = ""
-            
-                                    # ✅ also clear the row selection so it doesn't auto-open preview again
-                                    st.session_state.pop("pub_table_click_df", None)
-            
-                                    st.rerun()
-
-                            if notice_html:
-                                st.markdown(notice_html, unsafe_allow_html=True)
-
-                            components.iframe(url, height=650, scrolling=True)
-            
-                        preview_dialog(selected_url)
-            
-                    else:
-                        st.info("Popup preview not supported in this Streamlit version — showing inline preview below.")
-                        components.iframe(selected_url, height=820, scrolling=True)
-                            
-    if hasattr(st, "dialog") and st.session_state.get("pub_open_single_delete_dialog"):
-    
-        @st.dialog("Confirm delete", width="large")
-        def confirm_single_delete_dialog():
-            target = st.session_state.get("pub_single_delete_target") or {}
-            repo = (target.get("Repo") or "").strip()
-            file = (target.get("File") or "").strip()
-    
-            st.warning("This will permanently delete the selected HTML + bundle files from GitHub.")
-            st.markdown("**You are deleting:**")
-            st.write(
-                {
-                    "Brand": target.get("Brand", ""),
-                    "Table Name": target.get("Table Name", ""),
-                    "Repo": repo,
-                    "File": file,
-                    "Pages URL": target.get("Pages URL", ""),
-                    "Created By": target.get("Created By", ""),
-                    "Created UTC": target.get("Created UTC", ""),
-                }
-            )
-    
-            passkey = st.text_input("Enter admin passkey", type="password", key="pub_single_delete_passkey")
-            i_understand = st.checkbox("I understand this cannot be undone", key="pub_single_delete_ack")
-    
-            do_it = st.button("✅ Confirm delete", disabled=not (passkey and i_understand), type="primary")
-    
-            if do_it:
-                expected = str(st.secrets.get("ADMIN_DELETE_CODE", "") or "")
-                if not expected or not hmac.compare_digest(passkey, expected):
-                    st.error("Wrong passkey.")
-                    return
-    
-                try:
-                    # delete main HTML
-                    delete_github_file(publish_owner, repo, token_to_use, file, branch="main")
-    
-                    # delete bundle at bundles/{file}.json
-                    bundle_path = f"bundles/{file}.json"
-                    delete_github_file(publish_owner, repo, token_to_use, bundle_path, branch="main")
-    
-                    # remove from registry (recommended)
-                    remove_from_widget_registry(publish_owner, repo, token_to_use, file, branch="main")
-    
-                    st.success("Deleted successfully.")
-    
-                except Exception as e:
-                    st.error(f"Delete failed: {e}")
-                    return
-    
-                # Clean up + refresh
-                st.session_state["pub_open_single_delete_dialog"] = False
-                st.session_state.pop("pub_single_delete_target", None)
-    
-                try:
-                    st.cache_data.clear()
-                except Exception:
-                    pass
-    
-                st.session_state.pop("df_pub_cache", None)
-                st.rerun()
-    
-        # reset the flag immediately so it doesn't reopen repeatedly unless set again
-        st.session_state["pub_open_single_delete_dialog"] = False
-        confirm_single_delete_dialog()           
-# =========================================================
-# ✅ TAB 1: Create New Table  (ALL CREATE UI HERE)
-# =========================================================
-if main_tab == "Create New Table":
+def _render_create_new_table():
 
     # =========================================================
     # ✅ "Created by" comes from the global selector above
@@ -4745,10 +4106,10 @@ if main_tab == "Create New Table":
         # ✅ Allow Create tab to work for BOTH:
         # 1) normal uploaded CSV
         # 2) bundle-loaded df in session_state (Edit flow)
-        
+    
         df_loaded = st.session_state.get("bt_df_uploaded")
         has_loaded_df = isinstance(df_loaded, pd.DataFrame) and not df_loaded.empty
-        
+    
         if uploaded_file is None and not has_loaded_df:
             st.info("Upload A CSV To Start.")
         elif brand_selected_global == "Choose a brand...":
@@ -4764,19 +4125,19 @@ if main_tab == "Create New Table":
                 except Exception as e:
                     st.error(f"Error Reading CSV: {e}")
                     df_uploaded_now = pd.DataFrame()
-        
+    
                 uploaded_name = getattr(uploaded_file, "name", "uploaded.csv")
-        
+    
             else:
                 # bundle-loaded case
                 df_uploaded_now = df_loaded.copy()
                 uploaded_name = st.session_state.get("bt_uploaded_name", "loaded_bundle.csv")
-        
+    
             if df_uploaded_now.empty:
                 st.error("Uploaded CSV Has No Rows.")
             else:
                 prev_name = st.session_state.get("bt_uploaded_name")
-        
+    
                 # ✅ Only reset/init when the "source" changes
                 if prev_name != uploaded_name:
                     reset_widget_state_for_new_upload()
@@ -4784,12 +4145,12 @@ if main_tab == "Create New Table":
                     st.session_state["bt_df_source"] = df_uploaded_now.copy(deep=True)     # original backup
                     st.session_state["bt_df_uploaded"] = df_uploaded_now.copy(deep=True)   # live editable version
                     st.session_state["bt_df_confirmed"] = df_uploaded_now.copy(deep=True)  # confirmed snapshot seed
-        
+    
                 ensure_confirm_state_exists()
                 restore_draft_state_from_confirmed()
 
 
-        
+    
                 _restore_header_draft()
 
                 left_col, right_col = st.columns([1, 3], gap="large")
@@ -4803,29 +4164,29 @@ if main_tab == "Create New Table":
                         label_visibility="collapsed",
                         key="bt_right_view",
                     )
-                    
+                
                     # Always create this so the preview renderer at the bottom can use it
                     preview_slot = st.container()
-                    
+                
                     if right_view == "Preview":
                         st.markdown("### Preview")
-                
+            
                     else:
                         st.markdown("### Edit table content (Optional)")
                         st.caption("Edit cells + hide columns here. Click **Apply changes to preview** to update the preview.")
-                
+            
                         df_live = st.session_state.get("bt_df_uploaded")
-                
+            
                         if not isinstance(df_live, pd.DataFrame) or df_live.empty:
                             st.info("Upload a CSV to enable editing.")
                         else:
                             all_cols = list(df_live.columns)
-                
+            
                             st.session_state.setdefault(
                                 "bt_hidden_cols_draft",
                                 st.session_state.get("bt_hidden_cols", []) or []
                             )
-                
+            
                             st.multiselect(
                                 "Hide columns",
                                 options=all_cols,
@@ -4833,11 +4194,11 @@ if main_tab == "Create New Table":
                                 key="bt_hidden_cols_draft",
                                 help="Hidden columns will be removed from preview + final output after Apply.",
                             )
-                
+            
                             hidden_cols_draft = st.session_state.get("bt_hidden_cols_draft", []) or []
                             visible_cols = [c for c in all_cols if c not in set(hidden_cols_draft)]
                             df_visible = df_live[visible_cols].copy()
-                
+            
                             edited_df_visible = st.data_editor(
                                 df_visible,
                                 use_container_width=True,
@@ -4853,21 +4214,21 @@ if main_tab == "Create New Table":
                                 use_container_width=True,
                                 on_click=reset_table_edits,
                             )
-                            
+                        
                             if apply_clicked:
                                 # ✅ Save hidden columns
                                 st.session_state["bt_hidden_cols"] = st.session_state.get("bt_hidden_cols_draft", []) or []
-                            
+                        
                                 # ✅ Apply edited visible columns back into the full live df
                                 base = st.session_state["bt_df_uploaded"].copy()
                                 for col in edited_df_visible.columns:
                                     base[col] = edited_df_visible[col].values
-                            
+                        
                                 st.session_state["bt_df_uploaded"] = base
                                 st.session_state["bt_body_apply_flash"] = True
-                            
+                        
                                 st.rerun()
-                            
+                        
                             if st.session_state.get("bt_body_apply_flash", False):
                                 st.success("Preview updated ✅")
                                 st.session_state["bt_body_apply_flash"] = False
@@ -5113,14 +4474,14 @@ if main_tab == "Create New Table":
                                     value=st.session_state.get("bt_striped_rows", True),
                                     key="bt_striped_rows",
                                 )
-                        
+                    
                                 st.selectbox(
                                     "Table Content Alignment",
                                     options=["Center", "Left", "Right"],
                                     index=["Center", "Left", "Right"].index(st.session_state.get("bt_cell_align", "Center")),
                                     key="bt_cell_align",
                                 )
-                        
+                    
                                 st.selectbox(
                                     "Column header style",
                                     options=["Keep original", "Sentence case", "Title Case", "ALL CAPS"],
@@ -5128,13 +4489,13 @@ if main_tab == "Create New Table":
                                     key="bt_header_style",
                                     help="Controls how column headers are displayed. This does not change your CSV data.",
                                 )
-                        
+                    
                                 st.divider()
                                 st.markdown("#### Table Controls")
-                        
+                    
                                 st.checkbox("Show Search", value=st.session_state.get("bt_show_search", True), key="bt_show_search")
                                 st.checkbox("Show Pager", value=st.session_state.get("bt_show_pager", True), key="bt_show_pager")
-                        
+                    
                                 st.checkbox(
                                     "Show Page Numbers",
                                     value=st.session_state.get("bt_show_page_numbers", True),
@@ -5142,36 +4503,36 @@ if main_tab == "Create New Table":
                                     disabled=not st.session_state.get("bt_show_pager", True),
                                     help="Only works when Pager is enabled.",
                                 )
-                        
+                    
                                 st.checkbox(
                                     "Show Embed / Download Button",
                                     key="bt_show_embed",
                                 )
-                        
+                    
                                 st.divider()
                                 st.markdown("#### Column Formatting (Live Preview Only)")
-                        
+                    
                                 st.session_state.setdefault("bt_col_format_rules", {})
-                        
+                    
                                 df_for_cols = st.session_state.get("bt_df_uploaded")
                                 all_cols = list(df_for_cols.columns) if isinstance(df_for_cols, pd.DataFrame) and not df_for_cols.empty else []
-                        
+                    
                                 if not all_cols:
                                     st.info("Upload a CSV to enable column formatting.")
                                 else:
                                     st.selectbox("Column", options=all_cols, key="bt_fmt_selected_col")
                                     st.selectbox("Format", options=["prefix", "suffix", "plus_if_positive"], key="bt_fmt_selected_mode")
-                        
+                    
                                     mode = st.session_state.get("bt_fmt_selected_mode", "prefix")
                                     if mode in ("prefix", "suffix"):
                                         st.text_input("Value", key="bt_fmt_value", placeholder="$")
                                     else:
                                         st.text_input("Value", value="(auto)", disabled=True, key="bt_fmt_value_disabled")
-                        
+                    
                                     def add_update_fmt():
                                         col = st.session_state.get("bt_fmt_selected_col")
                                         mode = st.session_state.get("bt_fmt_selected_mode", "prefix")
-                        
+                    
                                         if mode in ("prefix", "suffix"):
                                             v = (st.session_state.get("bt_fmt_value", "") or "").strip()
                                             if not v:
@@ -5180,11 +4541,11 @@ if main_tab == "Create New Table":
                                             rule = {"mode": mode, "value": v}
                                         else:
                                             rule = {"mode": mode}
-                        
+                    
                                         st.session_state["bt_col_format_rules"][col] = rule
-                        
+                    
                                     st.button("✅ Add / Update", use_container_width=True, on_click=add_update_fmt)
-                        
+                    
                                     if st.session_state["bt_col_format_rules"]:
                                         st.caption("Current formatting rules:")
                                         st.json(st.session_state["bt_col_format_rules"])
@@ -5255,13 +4616,13 @@ if main_tab == "Create New Table":
                         with sub_heat:
                             with st.container(height=SETTINGS_PANEL_HEIGHT):
                                 st.markdown("#### Heatmap Columns")
-    
+
                                 df_for_cols = st.session_state.get("bt_df_uploaded")
                                 if not isinstance(df_for_cols, pd.DataFrame) or df_for_cols.empty:
                                     st.info("Upload a CSV to enable heatmap.")
                                 else:
                                     numeric_cols = [c for c in df_for_cols.columns if guess_column_type(df_for_cols[c]) == "num"]
-    
+
                                     if not numeric_cols:
                                         st.warning("No numeric columns found for heatmap.")
                                     else:
@@ -5288,7 +4649,7 @@ if main_tab == "Create New Table":
                                             key="bt_heatmap_style",
                                             help="Branded = current brand color intensity. Standard = 5-color scale (Green → Blue → Yellow → Orange → Red).",
                                         )
-    
+
                                         st.slider(
                                             "Heat strength",
                                             min_value=0.10,
@@ -5306,11 +4667,11 @@ if main_tab == "Create New Table":
                                             on_change=on_heat_scale_toggle,   # ✅ ADD THIS
                                             help="Adds a compact legend bar in the footer. Cannot be used with Footer Notes.",
                                         )
-    
+
                                         st.divider()
                                         st.markdown("#### Range Overrides (Optional)")
                                         st.session_state.setdefault("bt_heat_overrides", {})
-    
+
                                         selected = st.session_state.get("bt_heat_columns", [])
                                         if not selected:
                                             st.caption("Select at least one heat column to set overrides.")
@@ -5318,23 +4679,23 @@ if main_tab == "Create New Table":
                                             for col in selected:
                                                 cur = st.session_state["bt_heat_overrides"].get(col, {}) or {}
                                                 c1, c2 = st.columns(2)
-    
+
                                                 vmin = c1.text_input(
                                                     f"Min override: {col}",
                                                     value="" if cur.get("min") is None else str(cur.get("min")),
                                                     key=f"bt_heat_min_{col}",
                                                     help="Leave blank to auto-use column min.",
                                                 ).strip()
-    
+
                                                 vmax = c2.text_input(
                                                     f"Max override: {col}",
                                                     value="" if cur.get("max") is None else str(cur.get("max")),
                                                     key=f"bt_heat_max_{col}",
                                                     help="Leave blank to auto-use column max.",
                                                 ).strip()
-    
+
                                                 st.session_state["bt_heat_overrides"].setdefault(col, {})
-    
+
                                                 if vmin == "":
                                                     st.session_state["bt_heat_overrides"][col].pop("min", None)
                                                 else:
@@ -5342,7 +4703,7 @@ if main_tab == "Create New Table":
                                                         st.session_state["bt_heat_overrides"][col]["min"] = float(vmin)
                                                     except Exception:
                                                         st.warning(f"'{vmin}' is not a valid min for {col}.")
-    
+
                                                 if vmax == "":
                                                     st.session_state["bt_heat_overrides"][col].pop("max", None)
                                                 else:
@@ -5356,10 +4717,10 @@ if main_tab == "Create New Table":
                         # Live publish status UI
                         if st.session_state.get("bt_publish_in_progress", False):
                             st.info("🚀 Publishing updates… This can take up to a minute.")
-                        
+                    
                             pages_url = st.session_state.get("bt_last_published_url")
                             expected_hash = st.session_state.get("bt_expected_live_hash")
-                        
+                    
                             if pages_url and expected_hash:
                                 if st.button("Check if page is live"):
                                     if is_page_live_with_hash(pages_url, expected_hash):
@@ -5383,10 +4744,10 @@ if main_tab == "Create New Table":
                         st.session_state["bt_embed_started"] = True
                         embed_generated = bool(st.session_state.get("bt_embed_generated", False))
                         embed_stale = bool(st.session_state.get("bt_embed_stale", False))
-                    
+                
                         if embed_generated and embed_stale:
                             st.warning("Your embed scripts are out of date. Click **Create embed script** to publish the latest confirmed version.")
-                    
+                
                         btn_label = "Create embed script"
 
                         if not html_generated:
@@ -5429,15 +4790,15 @@ if main_tab == "Create New Table":
                         current_brand = st.session_state.get("brand_table", "")
                         repo_name = suggested_repo_name(current_brand)
                         st.session_state["bt_gh_repo"] = repo_name
-                        
+                    
                         can_check = bool(publish_owner and installation_token and repo_name and widget_file_name)
-                        
+                    
                         file_exists = False
                         existing_pages_url = ""
                         existing_meta = {}
                         can_overwrite_owner = False
                         existing_created_by = ""
-                        
+                    
                         # Auto-check existence (no separate "Check name availability" button)
                         if can_check:
                             file_exists = github_file_exists_cached(
@@ -5447,7 +4808,7 @@ if main_tab == "Create New Table":
                                 widget_file_name,
                                 branch="main",
                             )
-                        
+                    
                             if file_exists:
                                 existing_pages_url = compute_pages_url(publish_owner, repo_name, widget_file_name)
                                 try:
@@ -5461,24 +4822,24 @@ if main_tab == "Create New Table":
                                     existing_meta = registry.get(widget_file_name, {}) if isinstance(registry, dict) else {}
                                 except Exception:
                                     existing_meta = {}
-                        
+                    
                                 existing_created_by = (existing_meta.get("created_by", "") or "").strip().lower()
                                 can_overwrite_owner = (not existing_created_by) or (existing_created_by == created_by_user)
-                        
+                    
                         # ✅ store results so the rest of the UI logic below can use them on reruns
                         st.session_state["bt_file_exists"] = file_exists
                         st.session_state["bt_existing_pages_url"] = existing_pages_url
                         st.session_state["bt_existing_meta"] = existing_meta
                         st.session_state["bt_can_overwrite_owner"] = can_overwrite_owner
                         st.session_state["bt_existing_created_by"] = existing_created_by
-                        
+                    
                         file_exists = st.session_state.get("bt_file_exists", False)
                         existing_pages_url = st.session_state.get("bt_existing_pages_url", "")
                         existing_meta = st.session_state.get("bt_existing_meta", {})
                         can_overwrite_owner = st.session_state.get("bt_can_overwrite_owner", False)
                         existing_created_by = st.session_state.get("bt_existing_created_by", "")
                         embed_done = bool((st.session_state.get("bt_last_published_url") or "").strip())
-                        
+                    
                         # ✅ If the user already published this exact repo+file in this session,
                         # allow updates WITHOUT needing the overwrite checkbox.
                         same_target_as_last_publish = bool(
@@ -5486,7 +4847,7 @@ if main_tab == "Create New Table":
                             and st.session_state.get("bt_last_published_file") == widget_file_name
                             and st.session_state.get("bt_last_published_repo") == repo_name
                         )
-                        
+                    
                         if file_exists and not embed_done and not same_target_as_last_publish:
                             st.info("ℹ️ A page with this table name already exists.")
                             if existing_pages_url:
@@ -5497,7 +4858,7 @@ if main_tab == "Create New Table":
                                     f"Created by: {existing_meta.get('created_by','?')} | "
                                     f"UTC: {existing_meta.get('created_at_utc','?')}"
                                 )
-                        
+                    
                             if can_overwrite_owner:
                                 st.warning("This table already exists. To update it, type **UPDATE** below.")
                                 st.text_input(
@@ -5510,12 +4871,12 @@ if main_tab == "Create New Table":
                                 st.session_state["bt_update_confirm_text"] = ""
                                 owner_label = f"{existing_created_by}'s" if existing_created_by else "another user's"
                                 st.warning(f"⛔ This is **{owner_label} page**, so you can’t overwrite it.")
-                        
+                    
                         # ✅ Read typed confirmation
                         update_text = (st.session_state.get("bt_update_confirm_text", "") or "").strip().upper()
                         update_confirmed = (update_text == "UPDATE")   
                         swap_confirmed = (not file_exists) or (update_confirmed and can_overwrite_owner) or same_target_as_last_publish
-                        
+                    
                         can_publish = bool(
                             html_generated
                             and publish_owner
@@ -5525,7 +4886,7 @@ if main_tab == "Create New Table":
                             and created_by_user
                             and swap_confirmed
                         )
-                        
+                    
                         publish_clicked = st.button(
                             btn_label,
                             use_container_width=True,
@@ -5555,7 +4916,7 @@ if main_tab == "Create New Table":
                             st.session_state["bt_publish_started_at"] = time.time()
                             st.session_state["bt_expected_live_hash"] = st.session_state.get("bt_html_hash", "")
                             st.session_state["bt_live_confirmed"] = False
-                        
+                    
 
                             try:
                                 html_final = (
@@ -5583,11 +4944,11 @@ if main_tab == "Create New Table":
                                     f"Add/Update {widget_file_name} from Branded Table App",
                                     branch="main",
                                 )
-                                
+                            
                                 # ✅ NEW: also publish the editable bundle (CSV + config + rules)
                                 bundle = build_publish_bundle(widget_file_name)
                                 bundle_path = f"bundles/{widget_file_name}.json"
-                                
+                            
                                 upload_file_to_github(
                                     publish_owner,
                                     repo_name,
@@ -5597,9 +4958,9 @@ if main_tab == "Create New Table":
                                     f"Add/Update bundle for {widget_file_name}",
                                     branch="main",
                                 )
-                                
+                            
                                 pages_url = compute_pages_url(publish_owner, repo_name, widget_file_name)
-                                
+                            
                                 st.session_state["bt_last_published_url"] = pages_url
                                 st.session_state["bt_published_hash"] = st.session_state.get("bt_html_hash", "")
                                 st.session_state["bt_last_published_repo"] = repo_name
@@ -5644,18 +5005,18 @@ if main_tab == "Create New Table":
                                         pages_url,
                                         height=int(st.session_state.get("bt_iframe_height", 800)),
                                     )
-                                
+                            
                                     # ✅ IMPORTANT: mark the page live + stop "in progress" state
                                     st.session_state["bt_publish_in_progress"] = False
                                     st.session_state["bt_live_confirmed"] = True
-                                
+                            
                                     st.success("✅ Page is live. IFrame is ready.")
                                 else:
                                     st.session_state["bt_iframe_code"] = ""
-                                
+                            
                                     # ✅ still deploying
                                     st.session_state["bt_live_confirmed"] = False
-                                
+                            
                                     st.warning("⚠️ URL created but GitHub Pages is still deploying. Try again in ~30s.")
 
                             except Exception as e:
@@ -5678,14 +5039,14 @@ if main_tab == "Create New Table":
                                 label_visibility="collapsed",
                                 key="bt_embed_view",
                             )
-                            
+                        
                             if embed_view == "HTML Code":
                                 html_code_val = (st.session_state.get("bt_html_code") or "").strip()
                                 if not html_code_val:
                                     st.info("Click **Confirm & Save** to generate HTML.")
                                 else:
                                     st.caption("HTML Code")
-                            
+                        
                                     # ✅ Rendering huge st.code blocks is slow — use text_area (faster) + optional code view
                                     st.text_area(
                                         "HTML Code",
@@ -5694,7 +5055,7 @@ if main_tab == "Create New Table":
                                         label_visibility="collapsed",
                                         key="bt_html_code_view",
                                     )
-                            
+                        
                                     st.download_button(
                                         "Download HTML file",
                                         data=html_code_val,
@@ -5702,11 +5063,11 @@ if main_tab == "Create New Table":
                                         mime="text/html",
                                         use_container_width=True,
                                     )
-                            
+                        
                             else:
                                 iframe_val = (st.session_state.get("bt_iframe_code") or "").strip()
                                 st.caption("IFrame Code")
-                            
+                        
                                 st.text_area(
                                     "IFrame Code",
                                     value=iframe_val or "",
@@ -5714,7 +5075,7 @@ if main_tab == "Create New Table":
                                     label_visibility="collapsed",
                                     key="bt_iframe_code_view",
                                 )
-                            
+                        
                                 st.download_button(
                                     "Download iframe snippet",
                                     data=iframe_val or "",
@@ -5726,7 +5087,7 @@ if main_tab == "Create New Table":
                 # ✅ Render preview LAST (HARD-GATED: do NOT run on Get embed script)
                 _left_view = st.session_state.get("bt_left_view", "Edit table contents")
                 _right_view = st.session_state.get("bt_right_view", "Preview")
-                
+            
                 # Only render preview when:
                 # - Left view is "Edit table contents"
                 # - Right view is "Preview"
@@ -5734,28 +5095,28 @@ if main_tab == "Create New Table":
                     with preview_slot:
                         st.session_state.setdefault("bt_show_preview", False)
                         st.checkbox("Show live preview", key="bt_show_preview")
-                
+            
                         if not st.session_state["bt_show_preview"]:
                             st.info("Preview hidden for performance.")
                         else:
                             live_cfg = draft_config_from_state()
                             live_rules = st.session_state.get("bt_col_format_rules", {})
-                
+            
                             df_preview = st.session_state["bt_df_uploaded"].copy()
                             hidden_cols = st.session_state.get("bt_hidden_cols", []) or []
                             if hidden_cols:
                                 df_preview = df_preview.drop(columns=hidden_cols, errors="ignore")
-                
+            
                             cfg_hash = stable_config_hash(live_cfg)
-                
+            
                             try:
                                 df_hash = int(pd.util.hash_pandas_object(df_preview, index=True).sum())
                             except Exception:
                                 df_hash = hash((df_preview.shape, tuple(df_preview.columns)))
-                
+            
                             rules_hash = hash(json.dumps(live_rules, sort_keys=True, default=str))
                             preview_key = f"{cfg_hash}|{df_hash}|{rules_hash}"
-                
+            
                             if st.session_state.get("bt_preview_key") != preview_key:
                                 st.session_state["bt_preview_key"] = preview_key
                                 st.session_state["bt_preview_html"] = html_from_config(
@@ -5763,7 +5124,7 @@ if main_tab == "Create New Table":
                                     live_cfg,
                                     col_format_rules=live_rules,
                                 )
-                
+            
                             preview_rows = len(df_preview.index) if isinstance(df_preview, pd.DataFrame) else 0
                             preview_height = 820 if preview_rows > 10 else 560
                             components.html(
@@ -5774,3 +5135,624 @@ if main_tab == "Create New Table":
                 else:
                     # Clear any previously mounted preview so it does NOT persist visually
                     preview_slot.empty()
+
+
+def _render_published_tables():
+    st.markdown("### Published Tables")
+    st.caption("All published tables found in GitHub Pages across repos.")
+    # ✅ Current user (from the global selector above)
+    current_user = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
+
+    # ✅ Ensure filter keys exist (prevents weird state issues)
+    st.session_state.setdefault("pub_brand_filter", "All")
+    st.session_state.setdefault("pub_people_filter", "All")
+    st.session_state.setdefault("pub_month_filter", "All")
+    st.session_state.setdefault("pub_last_preview_url", "")
+
+    # ✅ Refresh button MUST live inside this tab
+    refresh_clicked = st.button(
+        "🔄 Refresh Published Tables",
+        key="pub_refresh_btn",
+        use_container_width=False,
+    )
+
+    publish_owner = (PUBLISH_OWNER or "").strip().lower()
+
+    token_to_use = ""
+    if GITHUB_PAT:
+        token_to_use = GITHUB_PAT
+    else:
+        try:
+            token_to_use = get_installation_token_for_user(publish_owner)
+        except Exception:
+            token_to_use = ""
+
+    if not publish_owner or not token_to_use:
+        st.warning("No publishing token found. Add GITHUB_PAT in secrets to view published tables.")
+    else:
+        # ✅ Only refetch when needed
+        if refresh_clicked or "df_pub_cache" not in st.session_state or "Has CSV" not in st.session_state["df_pub_cache"].columns:
+            if refresh_clicked:
+                st.cache_data.clear()
+            st.session_state["df_pub_cache"] = get_all_published_widgets(publish_owner, token_to_use)
+
+        df_pub = st.session_state.get("df_pub_cache")
+
+        if df_pub is None or df_pub.empty:
+            st.info("No published tables found yet.")
+        else:
+            # ✅ Normalize datetime once
+            df_pub = df_pub.copy()
+            df_pub["Created DT"] = pd.to_datetime(df_pub.get("Created UTC", ""), errors="coerce", utc=True)
+        
+            # ✅ Build filter options from FULL dataset
+            all_brands = sorted([b for b in df_pub["Brand"].dropna().unique() if str(b).strip()])
+            all_people = sorted([p for p in df_pub["Created By"].dropna().unique() if str(p).strip()])
+        
+            # ✅ Month filter keys + friendly labels
+            df_pub["MonthKey"] = df_pub["Created DT"].dt.strftime("%Y-%m")     # ex: 2026-01
+            df_pub["MonthLabel"] = df_pub["Created DT"].dt.strftime("%b %Y")   # ex: Jan 2026
+        
+            # ✅ map MonthKey -> MonthLabel (so selectbox can display friendly label)
+            month_label_map = (
+                df_pub.dropna(subset=["MonthKey"])
+                .drop_duplicates("MonthKey")
+                .set_index("MonthKey")["MonthLabel"]
+                .to_dict()
+            )
+        
+            all_month_keys = sorted([m for m in month_label_map.keys() if str(m).strip()], reverse=True)
+        
+            st.markdown("### Filters")
+        
+            col1, col2, col3, col4 = st.columns([1, 1, 1, 0.55])
+        
+            with col1:
+                brand_filter = st.selectbox(
+                    "Filter by brand",
+                    ["All"] + all_brands,
+                    key="pub_brand_filter",
+                )
+        
+            with col2:
+                people_filter = st.selectbox(
+                    "Filter by people",
+                    ["All"] + all_people,
+                    key="pub_people_filter",
+                )
+        
+            with col3:
+                month_filter = st.selectbox(
+                    "Filter by month",
+                    ["All"] + all_month_keys,    # ✅ store MonthKey in session_state
+                    key="pub_month_filter",
+                    format_func=lambda k: "All" if k == "All" else month_label_map.get(k, k),
+                )
+        
+            def reset_pub_filters():
+                st.session_state["pub_brand_filter"] = "All"
+                st.session_state["pub_people_filter"] = "All"
+                st.session_state["pub_month_filter"] = "All"
+                st.session_state["pub_last_preview_url"] = ""
+                st.rerun()  # <- strongly recommended so the rest of this run doesn't use stale local vars
+    
+            with col4:
+                st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                st.button(
+                    "Reset Filters",
+                    key="pub_reset_filters",
+                    use_container_width=True,
+                    on_click=reset_pub_filters,
+                )
+            # ✅ Always initialize so tab blocks never crash
+            df_view = pd.DataFrame()
+
+            # ✅ Apply filters
+            df_view = df_pub.copy()
+        
+            if brand_filter != "All":
+                df_view = df_view[df_view["Brand"] == brand_filter]
+        
+            if people_filter != "All":
+                df_view = df_view[df_view["Created By"] == people_filter]
+        
+            if month_filter != "All":
+                df_view = df_view[df_view["MonthKey"] == month_filter]
+        
+            # ✅ Optional: hide helper columns from display
+            df_view = df_view.drop(columns=["Created DT", "MonthKey", "MonthLabel"], errors="ignore")     
+
+            # ✅ If no matches
+            if df_view.empty:
+                st.warning("No results match your filters.")
+            else:
+                # ✅ Clean up any helper cols safely (no-ops if they don't exist)
+                df_view = df_view.drop(columns=["Created DT", "Month", "MonthKey", "MonthLabel"], errors="ignore")
+        
+                # ✅ Reset index once so selection rows map correctly everywhere
+                df_view = df_view.reset_index(drop=True)
+
+    # =========================================================
+    # ✅ PREVIEW + DELETE in TABS (side-by-side)
+    # =========================================================
+    st.markdown(
+        """
+        <style>
+          /* Full-width tab row */
+          div[data-baseweb="tab-list"] {
+            width: 100% !important;
+            display: flex !important;
+            gap: 0 !important;
+            background: #dff5ea !important;          /* pale green bar */
+            border-radius: 0 !important;
+            overflow: hidden !important;
+            border: 1px solid rgba(0,0,0,0.08) !important;
+          }
+
+          /* Each tab is 50/50 */
+          button[data-baseweb="tab"] {
+            flex: 1 1 0 !important;
+            justify-content: center !important;
+            padding: 14px 12px !important;
+            font-weight: 700 !important;
+            border: none !important;
+            margin: 0 !important;
+            background: transparent !important;
+          }
+
+          /* ACTIVE tab */
+          button[data-baseweb="tab"][aria-selected="true"] {
+            background: #00c853 !important;          /* strong green */
+            color: #ffffff !important;
+          }
+          button[data-baseweb="tab"][aria-selected="true"] * {
+            color: #ffffff !important;
+          }
+
+          /* INACTIVE tab */
+          button[data-baseweb="tab"][aria-selected="false"] {
+            color: #0b1f16 !important;
+          }
+          button[data-baseweb="tab"][aria-selected="false"]:hover {
+            background: rgba(0, 200, 83, 0.12) !important;
+          }
+
+          /* Remove Streamlit's default underline/highlight if present */
+          div[data-baseweb="tab-highlight"] { display: none !important; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    # ✅ Fallback safeguard before tabs
+    if "df_view" not in locals():
+        df_view = st.session_state.get("df_pub_cache", pd.DataFrame())
+        if not isinstance(df_view, pd.DataFrame):
+            df_view = pd.DataFrame()
+    
+    tab_preview_tables, tab_delete_tables = st.tabs(
+        ["Preview tables", "Delete tables (admin)"]
+    )
+
+    # -----------------------------
+    # TAB: DELETE TABLES (ADMIN)
+    # -----------------------------
+    with tab_delete_tables:
+        st.markdown("#### Delete tables (admin)")
+
+        delete_cols = ["Brand", "Table Name", "Has CSV", "Pages URL", "Repo", "File", "Created By", "Created UTC"]
+        df_delete = df_view.copy() if isinstance(df_view, pd.DataFrame) else pd.DataFrame()
+
+        # Make sure all required columns exist (prevents KeyError)
+        for c in delete_cols:
+            if c not in df_delete.columns:
+                df_delete[c] = ""
+
+        df_delete = df_delete[delete_cols].reset_index(drop=True)
+
+        # Add checkbox column (multi-select)
+        df_delete.insert(0, "Delete?", False)
+
+        edited = st.data_editor(
+            df_delete,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed",
+            column_config={
+                "Delete?": st.column_config.CheckboxColumn("Delete?", help="Tick rows you want to delete"),
+                "Pages URL": st.column_config.TextColumn("Pages URL"),
+            },
+            disabled=[c for c in df_delete.columns if c != "Delete?"],
+            key="pub_delete_editor",
+        )
+
+        to_delete = edited[edited["Delete?"] == True].copy()
+        st.session_state["pub_to_delete"] = to_delete.to_dict("records")  # ✅ snapshot for dialog
+        delete_disabled = to_delete.empty
+
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.caption(f"Selected: **{len(to_delete)}**")
+
+        with c2:
+            delete_clicked = st.button(
+                "🗑️ Delete selected",
+                disabled=delete_disabled,
+                use_container_width=True,
+                type="secondary",
+                key="pub_delete_btn",
+            )
+
+        if delete_clicked:
+            if not hasattr(st, "dialog"):
+                st.error("Your Streamlit version doesn’t support dialogs. Update Streamlit or use an inline confirmation block.")
+            else:
+                @st.dialog("Confirm delete", width="large")
+                def confirm_delete_dialog():
+                    rows = st.session_state.get("pub_to_delete", []) or []
+                    df_del = pd.DataFrame(rows)
+
+                    st.warning("This will permanently delete the selected HTML + bundle files from GitHub.")
+                    st.markdown("**You are deleting:**")
+
+                    if df_del.empty:
+                        st.info("No rows selected.")
+                        return
+
+                    st.dataframe(
+                        df_del[["Brand", "Table Name", "Repo", "File", "Created By", "Created UTC"]],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+                    passkey = st.text_input("Enter admin passkey", type="password", key="pub_delete_passkey")
+                    i_understand = st.checkbox("I understand this cannot be undone", key="pub_delete_ack")
+
+                    do_it = st.button(
+                        "✅ Confirm delete",
+                        disabled=not (passkey and i_understand),
+                        type="primary",
+                        key="pub_confirm_delete_btn",
+                    )
+
+                    if do_it:
+                        expected = str(st.secrets.get("ADMIN_DELETE_CODE", "") or "")
+                        if not expected or not hmac.compare_digest(passkey, expected):
+                            st.error("Wrong passkey.")
+                            return
+
+                        errors = []
+                        for _, r in df_del.iterrows():
+                            repo = (r.get("Repo") or "").strip()
+                            file = (r.get("File") or "").strip()
+
+                            if not repo or not file:
+                                errors.append(f"Missing Repo/File for row: {r.get('Pages URL')}")
+                                continue
+
+                            try:
+                                # delete main HTML
+                                delete_github_file(publish_owner, repo, token_to_use, file, branch="main")
+
+                                # delete bundle written as bundles/{widget_file_name}.json (widget_file_name already ends with .html)
+                                bundle_path = f"bundles/{file}.json"
+                                delete_github_file(publish_owner, repo, token_to_use, bundle_path, branch="main")
+
+                                # remove from widget_registry.json (recommended)
+                                remove_from_widget_registry(publish_owner, repo, token_to_use, file, branch="main")
+
+                            except Exception as e:
+                                errors.append(f"{repo}/{file}: {e}")
+
+                        if errors:
+                            st.error("Some deletes failed:")
+                            st.write(errors)
+                        else:
+                            st.success("Deleted successfully.")
+
+                        # Refresh list after deletes
+                        try:
+                            st.cache_data.clear()
+                        except Exception:
+                            pass
+                        st.session_state.pop("df_pub_cache", None)
+                        st.session_state.pop("pub_to_delete", None)
+                        st.rerun()
+
+                confirm_delete_dialog()
+
+    # -----------------------------
+    # TAB: PREVIEW TABLES
+    # -----------------------------
+    with tab_preview_tables:
+        st.markdown("#### Click a row to preview")
+
+        df_display = df_view.copy()
+        if "Pages URL" in df_display.columns:
+            df_display["Pages URL"] = df_display["Pages URL"].astype(str)
+        else:
+            df_display["Pages URL"] = ""
+
+        preview_cols = ["Brand", "Table Name", "Has CSV", "Pages URL", "Created By", "Created UTC"]
+        for c in preview_cols:
+            if c not in df_display.columns:
+                df_display[c] = ""
+
+        event = st.dataframe(
+            df_display[preview_cols],
+            use_container_width=True,
+            hide_index=True,
+            selection_mode="single-row",
+            on_select="rerun",
+            key="pub_table_click_df",
+            column_config={
+                "Pages URL": st.column_config.TextColumn("Pages URL"),
+            },
+        )
+
+        # ✅ Extract selected row → auto-preview popup
+        selected_rows = []
+        try:
+            selected_rows = event.selection.rows or []
+        except Exception:
+            selected_rows = []
+
+        if selected_rows:
+            selected_idx = selected_rows[0]
+            selected_url = (df_display.loc[selected_idx, "Pages URL"] or "").strip()
+
+            # ✅ row comes from df_display to ensure index alignment
+            row = df_display.loc[selected_idx]
+
+            selected_repo = (row.get("Repo") or "").strip()
+            selected_file = (row.get("File") or "").strip()
+
+            row_created_by = (row.get("Created By") or "").strip().lower()
+            current_user = (st.session_state.get("bt_created_by_user", "") or "").strip().lower()
+
+            # ✅ must pick a user in Published tab for editing
+            can_edit = bool(current_user) and ((not row_created_by) or (row_created_by == current_user))
+
+            # ✅ If we're about to open the delete-confirm dialog, do NOT open the preview dialog too
+            if st.session_state.get("pub_open_single_delete_dialog"):
+                pass
+            else:
+                if selected_url:
+                    # ✅ Prevent re-opening popup every rerun if same row clicked again
+                    last = st.session_state.get("pub_last_preview_url", "")
+                    if selected_url != last:
+                        st.session_state["pub_last_preview_url"] = selected_url
+        
+                    # ✅ Popup modal preview (if supported)
+                    if hasattr(st, "dialog"):
+        
+                        @st.dialog("Table Preview", width="large")
+                        def preview_dialog(url):
+                            st.markdown(f"**Previewing:** {url}")
+
+                            # ✅ left-aligned notice strip (used when table is not editable / legacy)
+                            notice_html = ""
+
+                            c1, c2, c3 = st.columns(3)
+        
+                            with c1:
+                                st.link_button("🔗 Open live page", url, use_container_width=True)
+        
+                            with c2:
+                                if not can_edit:
+                                    owner_name = row_created_by or "someone else"
+                                    st.button(f"✏️ Edit {owner_name}'s table", disabled=True, use_container_width=True)
+
+                                    notice_html = f'''
+                                    <div style="
+                                      margin-top: 10px;
+                                      padding: 10px 12px;
+                                      border-radius: 10px;
+                                      background: rgba(255, 193, 7, 0.16);
+                                      border: 1px solid rgba(255, 193, 7, 0.45);
+                                      color: #7a4b00;
+                                      font-size: 13px;
+                                      line-height: 1.25;
+                                      text-align: left;
+                                    ">
+                                      <strong>Note:</strong> Only <strong>{owner_name}</strong> can edit this table.
+                                    </div>
+                                    '''
+                                else:
+                                    has_csv = (row.get("Has CSV") == "✅")
+
+                                    if not has_csv:
+                                        st.button("✏️ Edit this table", disabled=True, use_container_width=True)
+                                        notice_html = '''<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(59,130,246,0.10);border:1px solid rgba(59,130,246,0.25);color:#1f3a8a;font-size:13px;line-height:1.25;text-align:left;"><strong>Note:</strong> Legacy table (no editable bundle). Re-publish once from <strong>Create New Table</strong> to enable full edit restore.</div>'''
+                                    else:
+                                        if st.button(
+                                            "✏️ Edit this table",
+                                            key=f"pub_edit_{selected_repo}_{selected_file}",
+                                            use_container_width=True,
+                                        ):
+                                            # ✅ jump to editor tab first, otherwise rerun stays on Published Tables
+                                            st.session_state["main_tab"] = "Create New Table"
+
+                                            # ✅ prevent the preview from re-opening on rerun
+                                            st.session_state["pub_last_preview_url"] = ""
+                                            st.session_state.pop("pub_table_click_df", None)
+
+                                            # ✅ load the bundle (this already calls st.rerun())
+                                            bundle_path = f"bundles/{selected_file}.json"
+                                            bundle_probe = read_github_json(publish_owner, selected_repo, token_to_use, bundle_path, branch="main")
+                                            if not bundle_probe:
+                                                st.error(f"Bundle not found at {bundle_path}. Cannot restore full table settings.")
+                                                st.stop()
+                                            load_bundle_into_editor(publish_owner, selected_repo, token_to_use, selected_file)
+                            with c3:
+                                if st.button(
+                                    "🗑️ Delete this table",
+                                    key=f"pub_delete_single_btn_{selected_repo}_{selected_file}",
+                                    use_container_width=True,
+                                    type="secondary",
+                                ):
+                                    st.session_state["pub_single_delete_target"] = {
+                                        "Repo": selected_repo,
+                                        "File": selected_file,
+                                        "Brand": row.get("Brand", ""),
+                                        "Table Name": row.get("Table Name", ""),
+                                        "Pages URL": url,
+                                        "Created By": row_created_by,
+                                        "Created UTC": row.get("Created UTC", ""),
+                                    }
+                                    st.session_state["pub_open_single_delete_dialog"] = True
+        
+                                    # ✅ prevent the preview dialog from being re-triggered on rerun
+                                    st.session_state["pub_last_preview_url"] = ""
+        
+                                    # ✅ also clear the row selection so it doesn't auto-open preview again
+                                    st.session_state.pop("pub_table_click_df", None)
+        
+                                    st.rerun()
+
+                            if notice_html:
+                                st.markdown(notice_html, unsafe_allow_html=True)
+
+                            components.iframe(url, height=650, scrolling=True)
+        
+                        preview_dialog(selected_url)
+        
+                    else:
+                        st.info("Popup preview not supported in this Streamlit version — showing inline preview below.")
+                        components.iframe(selected_url, height=820, scrolling=True)
+                        
+    if hasattr(st, "dialog") and st.session_state.get("pub_open_single_delete_dialog"):
+
+        @st.dialog("Confirm delete", width="large")
+        def confirm_single_delete_dialog():
+            target = st.session_state.get("pub_single_delete_target") or {}
+            repo = (target.get("Repo") or "").strip()
+            file = (target.get("File") or "").strip()
+
+            st.warning("This will permanently delete the selected HTML + bundle files from GitHub.")
+            st.markdown("**You are deleting:**")
+            st.write(
+                {
+                    "Brand": target.get("Brand", ""),
+                    "Table Name": target.get("Table Name", ""),
+                    "Repo": repo,
+                    "File": file,
+                    "Pages URL": target.get("Pages URL", ""),
+                    "Created By": target.get("Created By", ""),
+                    "Created UTC": target.get("Created UTC", ""),
+                }
+            )
+
+            passkey = st.text_input("Enter admin passkey", type="password", key="pub_single_delete_passkey")
+            i_understand = st.checkbox("I understand this cannot be undone", key="pub_single_delete_ack")
+
+            do_it = st.button("✅ Confirm delete", disabled=not (passkey and i_understand), type="primary")
+
+            if do_it:
+                expected = str(st.secrets.get("ADMIN_DELETE_CODE", "") or "")
+                if not expected or not hmac.compare_digest(passkey, expected):
+                    st.error("Wrong passkey.")
+                    return
+
+                try:
+                    # delete main HTML
+                    delete_github_file(publish_owner, repo, token_to_use, file, branch="main")
+
+                    # delete bundle at bundles/{file}.json
+                    bundle_path = f"bundles/{file}.json"
+                    delete_github_file(publish_owner, repo, token_to_use, bundle_path, branch="main")
+
+                    # remove from registry (recommended)
+                    remove_from_widget_registry(publish_owner, repo, token_to_use, file, branch="main")
+
+                    st.success("Deleted successfully.")
+
+                except Exception as e:
+                    st.error(f"Delete failed: {e}")
+                    return
+
+                # Clean up + refresh
+                st.session_state["pub_open_single_delete_dialog"] = False
+                st.session_state.pop("pub_single_delete_target", None)
+
+                try:
+                    st.cache_data.clear()
+                except Exception:
+                    pass
+
+                st.session_state.pop("df_pub_cache", None)
+                st.rerun()
+
+        # reset the flag immediately so it doesn't reopen repeatedly unless set again
+        st.session_state["pub_open_single_delete_dialog"] = False
+        confirm_single_delete_dialog()           
+
+
+# ✅ Style tabs as 50/50 pill bar (like your Preview/Delete tab style)
+st.markdown(
+    """
+    <style>
+      /* Full-width tab row */
+      div[data-baseweb="tab-list"] {
+        width: 100% !important;
+        display: flex !important;
+        gap: 0 !important;
+        background: #dff5ea !important;          /* pale green bar */
+        border-radius: 0 !important;
+        overflow: hidden !important;
+        border: 1px solid rgba(0,0,0,0.08) !important;
+      }
+
+      /* Each tab is 50/50 */
+      button[data-baseweb="tab"] {
+        flex: 1 1 0 !important;
+        justify-content: center !important;
+        padding: 14px 12px !important;
+        font-weight: 700 !important;
+        border: none !important;
+        margin: 0 !important;
+        background: transparent !important;
+      }
+
+      /* ACTIVE tab */
+      button[data-baseweb="tab"][aria-selected="true"] {
+        background: #00c853 !important;          /* strong green */
+        color: #ffffff !important;
+      }
+      button[data-baseweb="tab"][aria-selected="true"] * { color: #ffffff !important; }
+
+      /* INACTIVE tab */
+      button[data-baseweb="tab"][aria-selected="false"] { color: #0b1f16 !important; }
+      button[data-baseweb="tab"][aria-selected="false"]:hover { background: rgba(0, 200, 83, 0.12) !important; }
+
+      /* Remove underline/highlight */
+      div[data-baseweb="tab-highlight"] { display: none !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ✅ Streamlit always opens the first tab, so we reorder to "select" the one in session_state
+desired = st.session_state.get("main_tab", "Create New Table")
+tab_order = ["Create New Table", "Published Tables"] if desired != "Published Tables" else ["Published Tables", "Create New Table"]
+
+tab0, tab1 = st.tabs(tab_order)
+
+with tab0:
+    st.session_state["main_tab"] = tab_order[0]
+    if tab_order[0] == "Create New Table":
+        _render_create_new_table()
+    else:
+        _render_published_tables()
+
+with tab1:
+    st.session_state["main_tab"] = tab_order[1]
+    if tab_order[1] == "Create New Table":
+        _render_create_new_table()
+    else:
+        _render_published_tables()
+# =========================================================
+# ✅ TAB 2: Published Tables  (ONLY THIS VIEW)
+# =========================================================
+# =========================================================
+# ✅ TAB 1: Create New Table  (ALL CREATE UI HERE)
+# =========================================================
