@@ -4060,51 +4060,78 @@ st.session_state["bt_created_by_user"] = st.session_state.get("bt_logged_in_user
 st.markdown(
     """
     <style>
-      /* Scope styles ONLY to this wrapper */
-      .bt-main-tabs [data-testid="stRadio"] { margin-top: 0.25rem; }
+  /* =====================================================
+     MAIN NAV (Create New Table / Published Tables)
+     - Still uses st.radio for state control
+     - Visually matches Streamlit st.tabs (50/50, pill track)
+     ===================================================== */
 
-      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"]{
-        display:flex !important;
-        flex-direction:row !important;
-        gap:0 !important;
-        width:100% !important;
-        border: 1px solid rgba(0,0,0,0.10);
-        border-radius: 12px;
-        overflow:hidden;
-        background: rgba(0,0,0,0.04);
-      }
+  /* tighten spacing above the control */
+  .bt-main-tabs [data-testid="stRadio"] { margin-top: 0.25rem; }
 
-      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label{
-        flex:1 1 0 !important;
-        margin:0 !important;
-        padding:0 !important;
-      }
+  /* Turn the radio group into a two-tab bar */
+  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"]{
+    display:flex !important;
+    flex-direction:row !important;
+    gap:0 !important;
+    width:100% !important;
 
-      /* Hide the radio circle */
-      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child{
-        display:none !important;
-      }
+    border: 1px solid rgba(0,0,0,0.10);
+    border-radius: 12px;
+    overflow:hidden;
+    background: rgba(0,0,0,0.06);
+  }
 
-      /* Make the label look like a tab */
-      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label > div:last-child{
-        width:100% !important;
-        display:flex !important;
-        justify-content:center !important;
-        align-items:center !important;
-        padding: 10px 18px !important;
-        font-weight: 650 !important;
-        border-right: 1px solid rgba(0,0,0,0.10);
-      }
-      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label:last-child > div:last-child{
-        border-right: 0 !important;
-      }
+  /* Each option becomes a 50/50 “tab” */
+  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label{
+    flex: 1 1 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
 
-      /* Active tab (BaseWeb usually sets data-checked="true" on the label) */
-      .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] > div:last-child{
-        background: rgba(0, 200, 83, 0.18) !important;
-        color: #0b1f16 !important;
-      }
-    </style>
+  /* Hide the actual radio control (more robust across Streamlit/BaseWeb DOM changes) */
+  .bt-main-tabs [data-testid="stRadio"] input[type="radio"]{
+    position:absolute !important;
+    opacity:0 !important;
+    pointer-events:none !important;
+    width:0 !important;
+    height:0 !important;
+  }
+
+  /* The clickable “tab” surface */
+  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label{
+    display:flex !important;
+    align-items:stretch !important;
+  }
+
+  /* BaseWeb often wraps label text in the last child div - style it as the tab */
+  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label > div:last-child{
+    width:100% !important;
+    display:flex !important;
+    justify-content:center !important;
+    align-items:center !important;
+
+    padding: 14px 12px !important;
+    font-weight: 700 !important;
+    border-right: 1px solid rgba(0,0,0,0.10);
+    background: transparent !important;
+    color: #0b1f16 !important;
+  }
+  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label:last-child > div:last-child{
+    border-right: 0 !important;
+  }
+
+  /* ACTIVE tab */
+  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] > div:last-child{
+    background: #00c853 !important;          /* strong green (match your 2nd screenshot) */
+    color: #ffffff !important;
+  }
+
+  /* Hover for inactive tabs */
+  .bt-main-tabs [data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="false"] > div:last-child:hover{
+    background: rgba(0, 200, 83, 0.12) !important;
+  }
+</style>
     <div class="bt-main-tabs">
     """,
     unsafe_allow_html=True,
