@@ -630,7 +630,7 @@ def update_widget_registry(
 # - Each login/heartbeat refreshes the user's "last_seen" + expiry
 # =========================================================
 
-ACTIVE_USERS_PATH = "active_users.json"
+ACTIVE_USERS_PATH = str(get_secret("ACTIVE_STATE_FILE_PATH", "active_users.json") or "active_users.json").strip()
 ACTIVE_USER_TTL_MINUTES = int(get_secret("ACTIVE_USER_TTL_MINUTES", 45) or 45)
 ACTIVE_USER_HEARTBEAT_SECONDS = int(get_secret("ACTIVE_USER_HEARTBEAT_SECONDS", 60) or 60)
 
@@ -659,7 +659,7 @@ def get_active_state_repo(owner: str, token: str) -> str:
       1) secrets.ACTIVE_STATE_REPO (if set)
       2) lexicographically latest generator repo under the owner (fallback)
     """
-    preferred = str(get_secret("ACTIVE_STATE_REPO", "") or "").strip()
+    preferred = str(get_secret("ACTIVE_STATE_REPO", "BrandedGeneratorState") or "BrandedGeneratorState").strip()
     if preferred:
         return preferred
 
@@ -679,6 +679,22 @@ def get_active_state_repo(owner: str, token: str) -> str:
     # deterministic pick
     names = sorted(set(names), key=lambda s: s.lower())
     return names[-1]
+
+
+def active_state_repo_exists(owner: str, repo: str, token: str) -> bool:
+    """Best-effort check that the ACTIVE_STATE_REPO exists and is readable."""
+    try:
+        if not owner or not repo:
+            return False
+        r = http_session().get(
+            f"https://api.github.com/repos/{owner}/{repo}",
+            headers=github_headers(token),
+            timeout=15,
+        )
+        return r.status_code == 200
+    except Exception:
+        return False
+
 
 
 def utc_now_iso() -> str:
@@ -732,6 +748,8 @@ def read_active_users_state(owner: str, token: str) -> dict:
     repo = get_active_state_repo(owner, token)
     if not repo:
         return {}
+    if not active_state_repo_exists(owner, repo, token):
+        return {}
     try:
         raw = read_github_json(owner, repo, token, ACTIVE_USERS_PATH) or {}
         raw = raw if isinstance(raw, dict) else {}
@@ -744,6 +762,8 @@ def write_active_users_state(owner: str, token: str, user: str, action: str = "h
     """Upsert a user into active_users.json with a fresh expiry."""
     repo = get_active_state_repo(owner, token)
     if not repo:
+        return False
+    if not active_state_repo_exists(owner, repo, token):
         return False
 
     now = datetime.datetime.utcnow().replace(microsecond=0)
@@ -788,6 +808,8 @@ def remove_active_user(owner: str, token: str, user: str) -> bool:
     repo = get_active_state_repo(owner, token)
     if not repo:
         return False
+    if not active_state_repo_exists(owner, repo, token):
+        return False
 
     u = (user or "").strip().lower()
     if not u:
@@ -820,6 +842,10 @@ def remove_active_user(owner: str, token: str, user: str) -> bool:
 
 def render_active_users_banner(owner: str, token: str):
     """Display a top-of-app banner listing currently active users."""
+    repo = get_active_state_repo(owner, token)
+    if not repo or not active_state_repo_exists(owner, repo, token):
+        st.warning("Active-user state repo not found or not accessible. Set ACTIVE_STATE_REPO in secrets (e.g., BrandedGeneratorState).")
+        return
     state = read_active_users_state(owner, token)
     if not state:
         st.info("No active users detected (last ~{} mins).".format(ACTIVE_USER_TTL_MINUTES))
@@ -3843,31 +3869,62 @@ if ACTIVE_USERS_AUTO_REFRESH_SECONDS > 0:
         unsafe_allow_html=True,
     )
 
+
 try:
     render_active_users_banner(PUBLISH_OWNER, github_token(PUBLISH_OWNER))
 except Exception:
     pass
 
+
+def _get_user_passcodes() -> dict:
+    """Return a mapping of {username_lower: six_digit_code}.
+
+    Supports:
+      - secrets.USER_PASSCODES as a TOML table (preferred)
+      - PASSCODE_<USER> flat secrets keys (fallback)
+    """
+    out = {}
+    # Preferred: [USER_PASSCODES] table
+    try:
+        table = st.secrets.get("USER_PASSCODES", {})
     except Exception:
-        pass
+        table = {}
 
-    # fallback: PASSCODE_<USER> keys (optional)
-    for u in allowed_users:
-        k = f"PASSCODE_{u.upper()}"
+    if isinstance(table, Mapping):
+        for k, v in table.items():
+            u = str(k or "").strip().lower()
+            code = str(v or "").strip()
+            if u and re.fullmatch(r"\d{6}", code or ""):
+                out[u] = code
+
+    # Fallback: PASSCODE_<USER> keys
+    try:
+        all_keys = list(getattr(st.secrets, "_secrets", {}).keys())  # works on some runtimes
+    except Exception:
+        all_keys = []
+
+    # Also try a small known list if we can't enumerate
+    candidates = set(all_keys)
+
+    for key in candidates:
+        if not isinstance(key, str):
+            continue
+        if not key.startswith("PASSCODE_"):
+            continue
+        u = key.replace("PASSCODE_", "", 1).strip().lower()
         try:
-            v = st.secrets.get(k, "")
+            code = str(st.secrets.get(key, "") or "").strip()
         except Exception:
-            v = ""
-        if v:
-            out.setdefault(u.lower(), str(v).strip())
+            code = ""
+        if u and re.fullmatch(r"\d{6}", code or ""):
+            out.setdefault(u, code)
 
-    # keep only allowed users + sane 6-digit codes
-    cleaned = {}
-    for u in allowed_users:
-        code = (out.get(u.lower(), "") or "").strip()
-        if re.fullmatch(r"\d{6}", code or ""):
-            cleaned[u.lower()] = code
-    return cleaned
+    return out
+
+
+# Options shown in dropdown
+_user_passcodes = _get_user_passcodes()
+created_by_options = ["Select a user..."] + sorted(_user_passcodes.keys())
 
 def _validate_passcode(user: str, entered: str) -> bool:
     user = (user or "").strip().lower()
