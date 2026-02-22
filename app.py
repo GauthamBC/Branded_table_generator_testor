@@ -409,6 +409,24 @@ def get_all_published_widgets(owner: str, token: str) -> pd.DataFrame:
 
         return ""
 
+
+    def is_generator_repo(repo_name: str) -> bool:
+        """
+        Keep ONLY repos created/managed by this Branded Table Generator.
+        Expected naming pattern: <BrandPrefix>t<monthcode><yy>
+        Examples: ActionNetworktj26, VegasInsidertf26, RotoGrinderstj26
+        """
+        rn = (repo_name or "").strip().lower()
+        if not rn:
+            return False
+
+        # must start with one of our known brand prefixes
+        prefixes = [p.lower() for p in BRAND_REPO_PREFIX_FULL.values()]
+        if not any(rn.startswith(p) for p in prefixes):
+            return False
+
+        # must end with t + single-letter month code + 2-digit year (e.g., tj26)
+        return re.search(r"t[a-z]\d{2}$", rn) is not None
     def get_file_commit_meta(repo_name: str, file_name: str) -> tuple[str, str]:
         """
         Returns (created_by, created_utc) from latest commit touching the file.
@@ -540,7 +558,11 @@ def get_all_published_widgets(owner: str, token: str) -> pd.DataFrame:
     if not df.empty:
         df = df.drop_duplicates(subset=["Pages URL"], keep="first")
     
-    # ✅ Sort newest first (works best once commit dates exist)
+    
+    # ✅ Only show tables from Branded Table Generator repos (filter out random GitHub Pages)
+    if not df.empty and "Repo" in df.columns:
+        df = df[df["Repo"].apply(is_generator_repo)].copy()
+# ✅ Sort newest first (works best once commit dates exist)
     if not df.empty and "Created UTC" in df.columns:
         df = df.sort_values("Created UTC", ascending=False, na_position="last")
     
