@@ -4969,12 +4969,86 @@ if main_tab == "Create New Table":
                             st.info("Upload a CSV to enable editing.")
                         else:
                             all_cols = list(df_live.columns)
-                
+
                             st.session_state.setdefault(
                                 "bt_hidden_cols_draft",
                                 st.session_state.get("bt_hidden_cols", []) or []
                             )
-                
+
+                            editor_version = st.session_state.get("bt_editor_version", 0)
+                            editor_key_df = f"bt_df_editor_{editor_version}"
+                            editor_key_hdr = f"bt_header_editor_{editor_version}"
+
+                            def _apply_table_edits_to_preview():
+                                df_now = st.session_state.get("bt_df_uploaded")
+                                if not isinstance(df_now, pd.DataFrame) or df_now.empty:
+                                    return
+
+                                all_cols_now = list(df_now.columns)
+
+                                # ✅ Save hidden columns
+                                hidden_draft_now = st.session_state.get("bt_hidden_cols_draft", []) or []
+                                st.session_state["bt_hidden_cols"] = hidden_draft_now
+
+                                visible_cols_now = [c for c in all_cols_now if c not in set(hidden_draft_now)]
+
+                                # ✅ Apply header label overrides (display only)
+                                try:
+                                    base_overrides = dict(st.session_state.get("bt_col_header_overrides_draft", {}) or {})
+                                except Exception:
+                                    base_overrides = {}
+
+                                edited_hdr_df_now = st.session_state.get(editor_key_hdr)
+                                if isinstance(edited_hdr_df_now, pd.DataFrame):
+                                    try:
+                                        for _, rr in edited_hdr_df_now.iterrows():
+                                            orig = str(rr.get("Column", "") or "")
+                                            lbl = str(rr.get("Header label (optional)", "") or "").strip()
+                                            if not orig:
+                                                continue
+                                            if lbl == "" or lbl == orig:
+                                                base_overrides.pop(orig, None)
+                                            else:
+                                                base_overrides[orig] = lbl
+                                    except Exception:
+                                        pass
+
+                                st.session_state["bt_col_header_overrides"] = base_overrides
+                                st.session_state["bt_col_header_overrides_draft"] = dict(base_overrides)
+
+                                # ✅ Apply edited visible cells back into the full live df
+                                edited_df_visible_now = st.session_state.get(editor_key_df)
+                                if not isinstance(edited_df_visible_now, pd.DataFrame):
+                                    edited_df_visible_now = df_now[visible_cols_now].copy()
+
+                                base = df_now.copy()
+                                for col in visible_cols_now:
+                                    if col in edited_df_visible_now.columns and col in base.columns:
+                                        try:
+                                            base[col] = edited_df_visible_now[col].values
+                                        except Exception:
+                                            pass
+
+                                st.session_state["bt_df_uploaded"] = base
+                                st.session_state["bt_body_apply_flash"] = True
+
+                            # ✅ Put the buttons ABOVE the dropdown so users don't miss them
+                            b1, b2 = st.columns([1, 1])
+                            b1.button(
+                                "✅ Apply changes to preview",
+                                use_container_width=True,
+                                on_click=_apply_table_edits_to_preview,
+                            )
+                            b2.button(
+                                "↩ Reset table edits",
+                                use_container_width=True,
+                                on_click=reset_table_edits,
+                            )
+
+                            if st.session_state.get("bt_body_apply_flash", False):
+                                st.success("Preview updated ✅")
+                                st.session_state["bt_body_apply_flash"] = False
+
                             st.multiselect(
                                 "Hide columns",
                                 options=all_cols,
@@ -4982,7 +5056,7 @@ if main_tab == "Create New Table":
                                 key="bt_hidden_cols_draft",
                                 help="Hidden columns will be removed from preview + final output after Apply.",
                             )
-                
+
                             hidden_cols_draft = st.session_state.get("bt_hidden_cols_draft", []) or []
                             visible_cols = [c for c in all_cols if c not in set(hidden_cols_draft)]
                             df_visible = df_live[visible_cols].copy()
@@ -5000,7 +5074,7 @@ if main_tab == "Create New Table":
                                     "Header label (optional)": [draft_overrides.get(c, "") for c in visible_cols],
                                 })
 
-                                edited_hdr_df = st.data_editor(
+                                st.data_editor(
                                     hdr_df,
                                     use_container_width=True,
                                     hide_index=True,
@@ -5012,65 +5086,16 @@ if main_tab == "Create New Table":
                                             help="Leave blank to use the original column name. This only changes how the header is displayed (does not rename data columns).",
                                         ),
                                     },
-                                    key=f"bt_header_editor_{st.session_state.get('bt_editor_version', 0)}",
+                                    key=editor_key_hdr,
                                 )
 
-                            edited_df_visible = st.data_editor(
+                            st.data_editor(
                                 df_visible,
                                 use_container_width=True,
                                 hide_index=True,
                                 num_rows="fixed",
-                                key=f"bt_df_editor_{st.session_state.get('bt_editor_version', 0)}",
+                                key=editor_key_df,
                             )
-
-                            c1, c2 = st.columns([1, 1])
-                            apply_clicked = c1.button("✅ Apply changes to preview", use_container_width=True)
-                            reset_clicked = c2.button(
-                                "↩ Reset table edits",
-                                use_container_width=True,
-                                on_click=reset_table_edits,
-                            )
-                            
-                            if apply_clicked:
-                                # ✅ Save hidden columns
-                                st.session_state["bt_hidden_cols"] = st.session_state.get("bt_hidden_cols_draft", []) or []
-
-                                # ✅ Apply header label overrides (display only)
-                                try:
-                                    base_overrides = dict(st.session_state.get("bt_col_header_overrides_draft", {}) or {})
-                                except Exception:
-                                    base_overrides = {}
-
-                                # Update ONLY the currently visible columns; keep overrides for hidden columns
-                                try:
-                                    for _, rr in edited_hdr_df.iterrows():
-                                        orig = str(rr.get("Column", "") or "")
-                                        lbl = str(rr.get("Header label (optional)", "") or "").strip()
-                                        if not orig:
-                                            continue
-                                        if lbl == "" or lbl == orig:
-                                            base_overrides.pop(orig, None)
-                                        else:
-                                            base_overrides[orig] = lbl
-                                except Exception:
-                                    pass
-
-                                st.session_state["bt_col_header_overrides"] = base_overrides
-                                st.session_state["bt_col_header_overrides_draft"] = dict(base_overrides)
-                            
-                                # ✅ Apply edited visible columns back into the full live df
-                                base = st.session_state["bt_df_uploaded"].copy()
-                                for col in edited_df_visible.columns:
-                                    base[col] = edited_df_visible[col].values
-                            
-                                st.session_state["bt_df_uploaded"] = base
-                                st.session_state["bt_body_apply_flash"] = True
-                            
-                                st.rerun()
-                            
-                            if st.session_state.get("bt_body_apply_flash", False):
-                                st.success("Preview updated ✅")
-                                st.session_state["bt_body_apply_flash"] = False
 
                 # ===================== Left: Tabs =====================
                 with left_col:
