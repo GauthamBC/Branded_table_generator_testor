@@ -2849,6 +2849,8 @@ def generate_table_html_from_df(
     brand_logo_url: str,
     brand_logo_alt: str,
     brand_class: str,
+    title_style: str = "Keep original",
+    subtitle_style: str = "Keep original",
     striped: bool = True,
     center_titles: bool = False,
     branded_title_color: bool = True,
@@ -3240,6 +3242,10 @@ def generate_table_html_from_df(
     header_class = "centered" if center_titles else ""
     title_class = "branded" if branded_title_color else ""
 
+    # Apply optional casing rules to title/subtitle (same modes as header row)
+    title_display = format_column_header(title, title_style)
+    subtitle_display = format_column_header(subtitle, subtitle_style) if (subtitle or "").strip() else ""
+
     header_vis = "" if show_header else "vi-hide"
     footer_vis = "" if show_footer else "vi-hide"
 
@@ -3272,8 +3278,8 @@ def generate_table_html_from_df(
         .replace("[[TABLE_HEAD]]", table_head_html)
         .replace("[[TABLE_ROWS]]", table_rows_html)
         .replace("[[COLSPAN]]", colspan)
-        .replace("[[TITLE]]", html_mod.escape(title))
-        .replace("[[SUBTITLE]]", html_mod.escape(subtitle or ""))
+        .replace("[[TITLE]]", html_mod.escape(title_display))
+        .replace("[[SUBTITLE]]", html_mod.escape(subtitle_display or ""))
         .replace("[[BRAND_LOGO_URL]]", brand_logo_url)
         .replace("[[BRAND_LOGO_ALT]]", html_mod.escape(brand_logo_alt))
         .replace("[[BRAND_CLASS]]", brand_class or "")
@@ -3326,7 +3332,9 @@ def draft_config_from_state() -> dict:
     return {
         "brand": st.session_state.get("brand_table", "Action Network"),
         "title": st.session_state.get("bt_widget_title", "Table 1"),
+        "title_style": st.session_state.get("bt_title_style", "Keep original"),
         "subtitle": st.session_state.get("bt_widget_subtitle", "Subheading"),
+        "subtitle_style": st.session_state.get("bt_subtitle_style", "Keep original"),
         "striped": st.session_state.get("bt_striped_rows", True),
         "show_header": st.session_state.get("bt_show_header", True),
         "center_titles": st.session_state.get("bt_center_titles", False),
@@ -3358,7 +3366,9 @@ def html_from_config(df: pd.DataFrame, cfg: dict, col_format_rules: dict | None 
     return generate_table_html_from_df(
         df=df,
         title=cfg["title"],
+        title_style=cfg.get("title_style", "Keep original"),
         subtitle=cfg["subtitle"],
+        subtitle_style=cfg.get("subtitle_style", "Keep original"),
         brand_logo_url=meta["logo_url"],
         brand_logo_alt=meta["logo_alt"],
         brand_class=meta["brand_class"],
@@ -3508,8 +3518,14 @@ def load_bundle_into_editor(owner: str, repo: str, token: str, widget_file_name:
     st.session_state["bt_widget_title"]        = _pick(
         cfg.get("title"), cfg.get("table_title"), bundle.get("widget_title"), bundle.get("table_title"), default="Table 1"
     )
+    st.session_state["bt_title_style"]        = _pick(
+        cfg.get("title_style"), cfg.get("table_title_style"), bundle.get("title_style"), default="Keep original"
+    )
     st.session_state["bt_widget_subtitle"]     = _pick(
         cfg.get("subtitle"), cfg.get("table_subtitle"), bundle.get("widget_subtitle"), bundle.get("table_subtitle"), default="Subheading"
+    )
+    st.session_state["bt_subtitle_style"]     = _pick(
+        cfg.get("subtitle_style"), cfg.get("table_subtitle_style"), bundle.get("subtitle_style"), default="Keep original"
     )
 
     st.session_state["bt_show_header"]         = cfg.get("show_header", True)
@@ -3735,7 +3751,9 @@ def _cache_header_draft():
     for k in [
         "bt_show_header",
         "bt_widget_title",
+        "bt_title_style",
         "bt_widget_subtitle",
+        "bt_subtitle_style",
         "bt_center_titles",
         "bt_branded_title_color",
     ]:
@@ -3769,7 +3787,9 @@ def restore_draft_state_from_confirmed():
     mapping = {
         "brand": "brand_table",
         "title": "bt_widget_title",
+        "title_style": "bt_title_style",
         "subtitle": "bt_widget_subtitle",
+        "subtitle_style": "bt_subtitle_style",
         "striped": "bt_striped_rows",
         "show_header": "bt_show_header",
         "center_titles": "bt_center_titles",
@@ -3807,7 +3827,9 @@ def restore_draft_state_from_confirmed():
     # want to override back to confirmed if confirmed differs)
     known_defaults = {
         "bt_widget_title": "Table 1",
+        "bt_title_style": "Keep original",
         "bt_widget_subtitle": "Subheading",
+        "bt_subtitle_style": "Keep original",
         "bt_header_style": "Keep original",
         "bt_show_footer_notes": False,
         "bt_footer_notes": "",
@@ -4972,9 +4994,25 @@ if main_tab == "Create New Table":
                                     key="bt_widget_title",
                                     disabled=not show_header,
                                 )
+                                _case_opts = ["Keep original", "Sentence case", "Title case", "ALL CAPS"]
+                                st.selectbox(
+                                    "Title text case",
+                                    options=_case_opts,
+                                    index=_case_opts.index(st.session_state.get("bt_title_style", "Keep original")),
+                                    key="bt_title_style",
+                                    disabled=not show_header,
+                                )
+
                                 st.text_input(
                                     "Table Subtitle",
                                     key="bt_widget_subtitle",
+                                    disabled=not show_header,
+                                )
+                                st.selectbox(
+                                    "Subtitle text case",
+                                    options=_case_opts,
+                                    index=_case_opts.index(st.session_state.get("bt_subtitle_style", "Keep original")),
+                                    key="bt_subtitle_style",
                                     disabled=not show_header,
                                 )
 
@@ -5830,5 +5868,3 @@ if main_tab == "Create New Table":
                 else:
                     # Clear any previously mounted preview so it does NOT persist visually
                     preview_slot.empty()
-
-
