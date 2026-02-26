@@ -4962,6 +4962,14 @@ if main_tab == "Create New Table":
                     else:
                         st.markdown("### Edit table content (Optional)")
                         st.caption("Edit cells + hide columns here. Click **Apply changes to preview** to update the preview.")
+
+                        # Quick header preview (updates instantly as you type in the left panel)
+                        _t = apply_text_case(st.session_state.get("bt_widget_title", "Table 1"), st.session_state.get("bt_title_style", "Keep original"))
+                        _s = apply_text_case(st.session_state.get("bt_widget_subtitle", ""), st.session_state.get("bt_subtitle_style", "Keep original"))
+                        st.markdown(f"**{_t}**")
+                        if (_s or "").strip():
+                            st.markdown(_s)
+
                 
                         df_live = st.session_state.get("bt_df_uploaded")
                 
@@ -4998,7 +5006,9 @@ if main_tab == "Create New Table":
                                 except Exception:
                                     base_overrides = {}
 
-                                edited_hdr_df_now = st.session_state.get(editor_key_hdr)
+                                edited_hdr_df_now = st.session_state.get("bt_hdr_editor_df")
+                                if not isinstance(edited_hdr_df_now, pd.DataFrame):
+                                    edited_hdr_df_now = st.session_state.get(editor_key_hdr)
                                 if isinstance(edited_hdr_df_now, pd.DataFrame):
                                     try:
                                         for _, rr in edited_hdr_df_now.iterrows():
@@ -5017,7 +5027,9 @@ if main_tab == "Create New Table":
                                 st.session_state["bt_col_header_overrides_draft"] = dict(base_overrides)
 
                                 # ✅ Apply edited visible cells back into the full live df
-                                edited_df_visible_now = st.session_state.get(editor_key_df)
+                                edited_df_visible_now = st.session_state.get("bt_body_editor_df")
+                                if not isinstance(edited_df_visible_now, pd.DataFrame):
+                                    edited_df_visible_now = st.session_state.get(editor_key_df)
                                 if not isinstance(edited_df_visible_now, pd.DataFrame):
                                     edited_df_visible_now = df_now[visible_cols_now].copy()
 
@@ -5074,7 +5086,9 @@ if main_tab == "Create New Table":
                                     "Header label (optional)": [draft_overrides.get(c, "") for c in visible_cols],
                                 })
 
-                                st.data_editor(
+                                edited_hdr_df = st.data_editor(
+
+
                                     hdr_df,
                                     use_container_width=True,
                                     hide_index=True,
@@ -5086,16 +5100,71 @@ if main_tab == "Create New Table":
                                             help="Leave blank to use the original column name. This only changes how the header is displayed (does not rename data columns).",
                                         ),
                                     },
+
+
                                     key=editor_key_hdr,
+
+
                                 )
 
-                            st.data_editor(
+
+                                # store the edited header-label dataframe explicitly (Streamlit widget state isn't always a DataFrame)
+
+
+                                st.session_state["bt_hdr_editor_df"] = edited_hdr_df
+
+                            # Show header labels in the grid using draft overrides (or the original column name)
+
+
+                            draft_overrides_for_grid = st.session_state.get("bt_col_header_overrides_draft", {}) or {}
+
+
+                            hdr_style_for_grid = st.session_state.get("bt_header_style", "Keep original")
+
+
+                            grid_col_config = {}
+
+
+                            for _c in df_visible.columns:
+
+
+                                _base = (draft_overrides_for_grid.get(_c) or "").strip() or _c
+
+
+                                _lbl = str(_base) if hdr_style_for_grid == "Keep original" else format_column_header(str(_base), hdr_style_for_grid)
+
+
+                                # Use TextColumn for label only (data types remain unchanged)
+
+
+                                grid_col_config[_c] = st.column_config.TextColumn(_lbl)
+
+
+                            
+
+
+                            edited_body_df = st.data_editor(
+
+
                                 df_visible,
                                 use_container_width=True,
                                 hide_index=True,
                                 num_rows="fixed",
+
+
+                                column_config=grid_col_config,
+
+
                                 key=editor_key_df,
+
+
                             )
+
+
+                            # store edited body dataframe explicitly
+
+
+                            st.session_state["bt_body_editor_df"] = edited_body_df
 
                 # ===================== Left: Tabs =====================
                 with left_col:
