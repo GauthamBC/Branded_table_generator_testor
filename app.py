@@ -3246,6 +3246,15 @@ def generate_table_html_from_df(
     title_display = format_column_header(title, title_style)
     subtitle_display = format_column_header(subtitle, subtitle_style) if (subtitle or "").strip() else ""
 
+    # Subtitle supports simple markdown (**bold** and *italic*) like footer notes
+    subtitle_html = ""
+    if (subtitle_display or "").strip():
+        _s = html_mod.escape(subtitle_display)
+        _s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", _s)
+        _s = re.sub(r"\*(.+?)\*", r"<em>\1</em>", _s)
+        subtitle_html = _s
+
+
     header_vis = "" if show_header else "vi-hide"
     footer_vis = "" if show_footer else "vi-hide"
 
@@ -3279,7 +3288,7 @@ def generate_table_html_from_df(
         .replace("[[TABLE_ROWS]]", table_rows_html)
         .replace("[[COLSPAN]]", colspan)
         .replace("[[TITLE]]", html_mod.escape(title_display))
-        .replace("[[SUBTITLE]]", html_mod.escape(subtitle_display or ""))
+        .replace("[[SUBTITLE]]", subtitle_html)
         .replace("[[BRAND_LOGO_URL]]", brand_logo_url)
         .replace("[[BRAND_LOGO_ALT]]", html_mod.escape(brand_logo_alt))
         .replace("[[BRAND_CLASS]]", brand_class or "")
@@ -5015,6 +5024,104 @@ if main_tab == "Create New Table":
                                     placeholder="Subheading",
                                     disabled=not show_header,
                                 )
+
+                                st.caption("Shortcuts: **Ctrl/⌘+B** bold • **Ctrl/⌘+I** italic")
+
+                                components.html(
+                                    """
+                                    <script>
+                                    (function(){
+                                      const doc = window.parent && window.parent.document;
+                                      if(!doc) return;
+
+                                      function findInput(){
+                                        return doc.querySelector('input[aria-label="Table Subtitle"]');
+                                      }
+
+                                      function dispatchStreamlitInput(el){
+                                        el.dispatchEvent(new Event('input', { bubbles:true }));
+                                      }
+
+                                      function applyEdit(inp, start, end, replacement, selectMode){
+                                        inp.focus();
+                                        if (typeof inp.setRangeText === 'function'){
+                                          inp.setRangeText(replacement, start, end, selectMode || 'preserve');
+                                          dispatchStreamlitInput(inp);
+                                          return;
+                                        }
+                                        const v = inp.value ?? '';
+                                        inp.value = v.slice(0, start) + replacement + v.slice(end);
+                                        dispatchStreamlitInput(inp);
+                                      }
+
+                                      function getValue(el){ return el?.value ?? ''; }
+
+                                      function hasWrapper(text, left, right){
+                                        return text.startsWith(left) && text.endsWith(right);
+                                      }
+
+                                      function toggleWrapSelection(inp, left, right){
+                                        const start = inp.selectionStart ?? 0;
+                                        const end = inp.selectionEnd ?? 0;
+                                        const v = getValue(inp);
+
+                                        if (start === end){
+                                          applyEdit(inp, start, end, left + right, 'end');
+                                          const pos = start + left.length;
+                                          try{ inp.setSelectionRange(pos, pos); }catch(e){}
+                                          return;
+                                        }
+
+                                        const sel = v.slice(start, end);
+
+                                        if (hasWrapper(sel, left, right)){
+                                          const unwrapped = sel.slice(left.length, sel.length - right.length);
+                                          applyEdit(inp, start, end, unwrapped, 'select');
+                                          return;
+                                        }
+
+                                        applyEdit(inp, start, end, left + sel + right, 'select');
+                                      }
+
+                                      function mount(inp){
+                                        if(!inp || inp.dataset.btSubtitleMounted === '1') return;
+                                        inp.dataset.btSubtitleMounted = '1';
+
+                                        const isMac = navigator.platform.toUpperCase().includes('MAC');
+
+                                        inp.addEventListener('keydown', (e)=>{
+                                          const mod = isMac ? e.metaKey : e.ctrlKey;
+                                          if(!mod) return;
+
+                                          const k = (e.key || '').toLowerCase();
+
+                                          if (k === 'b'){
+                                            e.preventDefault();
+                                            toggleWrapSelection(inp, '**', '**');
+                                          }
+
+                                          if (k === 'i'){
+                                            e.preventDefault();
+                                            toggleWrapSelection(inp, '*', '*');
+                                          }
+                                        }, true);
+                                      }
+
+                                      const obs = new MutationObserver(()=>{
+                                        const inp = findInput();
+                                        if(inp) mount(inp);
+                                      });
+
+                                      obs.observe(doc.body, { childList:true, subtree:true });
+
+                                      const i0 = findInput();
+                                      if(i0) mount(i0);
+                                    })();
+                                    </script>
+                                    """,
+                                    height=0,
+                                )
+
                                 st.selectbox(
                                     "Subtitle text case",
                                     options=_case_opts,
