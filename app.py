@@ -2866,7 +2866,25 @@ def _bt_clear_formatting(state_key: str) -> None:
     k = str(state_key or "").strip()
     if not k:
         return
-    st.session_state[k] = remove_markdown_formatting(st.session_state.get(k, ""))
+    cleaned = remove_markdown_formatting(st.session_state.get(k, ""))
+    st.session_state[k] = cleaned
+    # keep any paired *_draft key in sync
+    dk = f"{k}_draft"
+    if dk in st.session_state:
+        st.session_state[dk] = cleaned
+
+
+# ======================================================
+# Ultra-smooth live preview: commit-on-blur draft fields
+# ======================================================
+def _bt_commit_subtitle() -> None:
+    # Commit draft subtitle to the canonical key used by config/preview/publish
+    st.session_state["bt_widget_subtitle"] = st.session_state.get("bt_widget_subtitle_draft", "")
+
+def _bt_commit_footer_notes() -> None:
+    # Commit draft footer notes to the canonical key used by config/preview/publish
+    st.session_state["bt_footer_notes"] = st.session_state.get("bt_footer_notes_draft", "")
+
 
 def generate_table_html_from_df(
     df: pd.DataFrame,
@@ -5047,11 +5065,13 @@ if main_tab == "Create New Table":
                                 
                                 sub_c1, sub_c2 = st.columns([0.86, 0.14])
                                 with sub_c1:
+                                    st.session_state.setdefault("bt_widget_subtitle_draft", st.session_state.get("bt_widget_subtitle", ""))
                                     st.text_input(
                                         "Table Subtitle",
-                                        key="bt_widget_subtitle",
+                                        key="bt_widget_subtitle_draft",
                                         placeholder="Subheading",
                                         disabled=not show_header,
+                                        on_change=_bt_commit_subtitle,
                                     )
                                 with sub_c2:
                                     st.write("")  # align with input
@@ -5232,13 +5252,14 @@ if main_tab == "Create New Table":
                                 
                                 fn_c1, fn_c2 = st.columns([0.86, 0.14])
                                 with fn_c1:
+                                    st.session_state.setdefault("bt_footer_notes_draft", st.session_state.get("bt_footer_notes", ""))
                                     st.text_area(
                                         "Footer notes",
-                                        value=st.session_state.get("bt_footer_notes", ""),
-                                        key="bt_footer_notes",
+                                        key="bt_footer_notes_draft",
                                         height=140,
                                         disabled=not (show_footer and show_footer_notes),
                                         help="Bold: **text**  •  Italic: *text*",
+                                        on_change=_bt_commit_footer_notes,
                                     )
                                 with fn_c2:
                                     st.write("")  # align with textarea
