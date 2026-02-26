@@ -168,6 +168,42 @@ def style_radio_as_tabs(
 
 
 # =========================================================
+# ✅ Text case helpers (Title/Sub-title/Header case)
+# =========================================================
+
+def apply_text_case(text: str, style: str) -> str:
+    """Apply a simple text casing rule.
+
+    Styles expected: Keep original | ALL CAPS | Title Case | Sentence case
+    """
+    s = "" if text is None else str(text)
+    style = (style or "").strip()
+
+    if style in ("", "Keep original"):
+        return s
+    if s == "":
+        return s
+
+    if style == "ALL CAPS":
+        return s.upper()
+
+    if style == "Sentence case":
+        s2 = s.strip()
+        if not s2:
+            return s
+        low = s2.lower()
+        # Uppercase the first alphabetical character
+        for idx, ch in enumerate(low):
+            if ch.isalpha():
+                return low[:idx] + ch.upper() + low[idx + 1 :]
+        return low
+
+    if style == "Title Case":
+        return s.title()
+
+    return s
+
+# =========================================================
 # 0) Publishing Users + Secrets (GITHUB APP)
 # =========================================================
 # ✅ "Created by" tracking list (UI only)
