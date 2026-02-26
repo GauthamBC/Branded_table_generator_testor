@@ -2858,6 +2858,16 @@ def remove_markdown_formatting(text: str) -> str:
     return s
 
 
+
+def _bt_clear_formatting(state_key: str) -> None:
+    """Clear formatting for a given session_state key (Ctrl+\ equivalent).
+    Safe to use as an on_click callback for buttons tied to text inputs / text areas.
+    """
+    k = str(state_key or "").strip()
+    if not k:
+        return
+    st.session_state[k] = remove_markdown_formatting(st.session_state.get(k, ""))
+
 def generate_table_html_from_df(
     df: pd.DataFrame,
     title: str,
@@ -5046,17 +5056,15 @@ if main_tab == "Create New Table":
                                 with sub_c2:
                                     st.write("")  # align with input
                                     st.write("")
-                                    if st.button(
+                                    st.button(
                                         "↺",
                                         key="bt_reset_subtitle_format",
                                         help="Clear formatting (Ctrl+\\)",
                                         disabled=not show_header,
                                         use_container_width=True,
-                                    ):
-                                        st.session_state["bt_widget_subtitle"] = remove_markdown_formatting(
-                                            st.session_state.get("bt_widget_subtitle", "")
-                                        )
-                                        st.rerun()
+                                        on_click=_bt_clear_formatting,
+                                        args=("bt_widget_subtitle",),
+                                    )
 
 
                                 st.caption("Shortcuts: **Ctrl/⌘+B** bold • **Ctrl/⌘+I** italic")
@@ -5236,17 +5244,15 @@ if main_tab == "Create New Table":
                                     st.write("")  # align with textarea
                                     st.write("")
                                     st.write("")
-                                    if st.button(
+                                    st.button(
                                         "↺",
                                         key="bt_reset_footer_notes_format",
                                         help="Clear formatting (Ctrl+\\)",
                                         disabled=not (show_footer and show_footer_notes),
                                         use_container_width=True,
-                                    ):
-                                        st.session_state["bt_footer_notes"] = remove_markdown_formatting(
-                                            st.session_state.get("bt_footer_notes", "")
-                                        )
-                                        st.rerun()
+                                        on_click=_bt_clear_formatting,
+                                        args=("bt_footer_notes",),
+                                    )
 
 
                                 components.html(
