@@ -3863,10 +3863,12 @@ def restore_draft_state_from_confirmed():
 
         current_val = st.session_state.get(ss_key)
 
-        # 1) If current is empty but confirmed isn't, restore
-        if is_empty(current_val) and not is_empty(confirmed_val):
-            st.session_state[ss_key] = confirmed_val
-            continue
+        # 1) If current is empty but confirmed isn't, restore.
+        # NOTE: Title/subtitle are allowed to be intentionally blank.
+        if ss_key not in ("bt_widget_title", "bt_widget_subtitle"):
+            if is_empty(current_val) and not is_empty(confirmed_val):
+                st.session_state[ss_key] = confirmed_val
+                continue
 
         # 2) If current snapped back to a known default (typically after tab switch),
         # but confirmed differs, restore.
@@ -3902,7 +3904,9 @@ def _restore_header_draft():
             st.session_state[k] = v
             continue
         cur = st.session_state.get(k)
-        if k in defaults and (cur is None or str(cur).strip() == "" or str(cur).strip() == defaults[k]) and str(v).strip() not in ("", defaults[k]):
+        # Allow users to intentionally clear title/subtitle (blank is valid).
+        # Only restore when Streamlit snaps back to the explicit default label.
+        if k in defaults and (cur is None or str(cur).strip() == defaults[k]) and str(v).strip() not in ("", defaults[k]):
             st.session_state[k] = v
 
 
@@ -4884,7 +4888,8 @@ if main_tab == "Create New Table":
                     preview_slot = st.container()
                     
                     if right_view == "Preview":
-                        st.markdown("### Preview")
+                        # (Intentionally blank) — remove the extra big "Preview" heading.
+                        pass
                 
                     else:
                         st.markdown("### Edit table content (Optional)")
@@ -4992,6 +4997,7 @@ if main_tab == "Create New Table":
                                 st.text_input(
                                     "Table Title",
                                     key="bt_widget_title",
+                                    placeholder="Table 1",
                                     disabled=not show_header,
                                 )
                                 _case_opts = ["Keep original", "Sentence case", "Title case", "ALL CAPS"]
@@ -5006,6 +5012,7 @@ if main_tab == "Create New Table":
                                 st.text_input(
                                     "Table Subtitle",
                                     key="bt_widget_subtitle",
+                                    placeholder="Subheading",
                                     disabled=not show_header,
                                 )
                                 st.selectbox(
