@@ -5173,7 +5173,7 @@ if main_tab == "Create New Table":
                                 # Use TextColumn for label only (data types remain unchanged)
 
 
-                                grid_col_config[_c] = st.column_config.TextColumn(_lbl)
+                                grid_col_config[_c] = st.column_config.Column(label=_lbl)
 
 
                             
