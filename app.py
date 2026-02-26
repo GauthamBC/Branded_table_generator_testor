@@ -2918,6 +2918,7 @@ def generate_table_html_from_df(
     heat_strength: float = 0.55,
     heatmap_style: str = "Branded heatmap",
     header_style: str = "Keep original",
+    col_header_overrides: dict | None = None,
     col_format_rules: dict | None = None,
 ) -> str:
 
@@ -3184,7 +3185,12 @@ def generate_table_html_from_df(
     head_cells = []
     for col in df.columns:
         col_type = guess_column_type(df[col])
-        display_col = format_column_header(col, header_style)
+        _ov = (col_header_overrides or {})
+        _base_label = _ov.get(col, col)
+        if header_style == "Keep original":
+            display_col = str(_base_label)
+        else:
+            display_col = format_column_header(str(_base_label), header_style)
         safe_label = html_mod.escape(display_col)
 
         # ✅ add class to bar columns so CSS can force min-width
@@ -3411,6 +3417,7 @@ def draft_config_from_state() -> dict:
         "heat_strength": st.session_state.get("bt_heat_strength", 0.55),
         "heatmap_style": st.session_state.get("bt_heatmap_style", "Branded heatmap"),
         "header_style": st.session_state.get("bt_header_style", "Keep original"),
+        "col_header_overrides": st.session_state.get("bt_col_header_overrides", {}) or {},
     }
 
 
@@ -3448,6 +3455,7 @@ def html_from_config(df: pd.DataFrame, cfg: dict, col_format_rules: dict | None 
         heat_strength=cfg.get("heat_strength", 0.55),
         heatmap_style=cfg.get("heatmap_style", "Branded heatmap"),
         header_style=cfg.get("header_style", "Keep original"),
+        col_header_overrides=cfg.get("col_header_overrides", {}) or {},
 
         # ✅ LIVE-ONLY formatting rules
         col_format_rules=col_format_rules,
@@ -3745,6 +3753,7 @@ def ensure_confirm_state_exists():
     st.session_state.setdefault("bt_last_published_repo", "")
     st.session_state.setdefault("bt_last_published_file", "")
     st.session_state.setdefault("bt_header_style", "Keep original")
+    st.session_state.setdefault("bt_col_header_overrides", {})
     st.session_state.setdefault("bt_embed_generated", False)  # show HTML/IFrame only after publish click
     st.session_state.setdefault("bt_embed_stale", False)      # becomes True after Confirm & Save post-publish
     st.session_state.setdefault("bt_published_hash", "")      # hash of last published HTML/config
@@ -3874,6 +3883,7 @@ def restore_draft_state_from_confirmed():
         "heatmap_style": "bt_heatmap_style",
 
         "header_style": "bt_header_style",
+        "col_header_overrides": "bt_col_header_overrides",
     }
 
     # Known defaults that commonly re-appear after reruns (these are the ones we
@@ -3884,6 +3894,7 @@ def restore_draft_state_from_confirmed():
         "bt_widget_subtitle": "Subheading",
         "bt_subtitle_style": "Keep original",
         "bt_header_style": "Keep original",
+        "bt_col_header_overrides": {},
         "bt_show_footer_notes": False,
         "bt_footer_notes": "",
         "bt_show_embed": True,
@@ -4039,6 +4050,10 @@ def reset_table_edits():
     # ✅ Clear hidden columns (both live + draft)
     st.session_state["bt_hidden_cols"] = []
     st.session_state["bt_hidden_cols_draft"] = []
+
+    # ✅ Clear header overrides
+    st.session_state["bt_col_header_overrides"] = {}
+    st.session_state["bt_col_header_overrides_draft"] = {}
 
     # ✅ Force data_editor to reset by changing its key
     st.session_state["bt_editor_version"] = int(st.session_state.get("bt_editor_version", 0)) + 1
@@ -4971,7 +4986,35 @@ if main_tab == "Create New Table":
                             hidden_cols_draft = st.session_state.get("bt_hidden_cols_draft", []) or []
                             visible_cols = [c for c in all_cols if c not in set(hidden_cols_draft)]
                             df_visible = df_live[visible_cols].copy()
-                
+
+                            # ✅ Header row editing (display labels)
+                            st.session_state.setdefault(
+                                "bt_col_header_overrides_draft",
+                                st.session_state.get("bt_col_header_overrides", {}) or {}
+                            )
+
+                            with st.expander("Edit header row (display labels)", expanded=False):
+                                draft_overrides = st.session_state.get("bt_col_header_overrides_draft", {}) or {}
+                                hdr_df = pd.DataFrame({
+                                    "Column": visible_cols,
+                                    "Header label (optional)": [draft_overrides.get(c, "") for c in visible_cols],
+                                })
+
+                                edited_hdr_df = st.data_editor(
+                                    hdr_df,
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    num_rows="fixed",
+                                    column_config={
+                                        "Column": st.column_config.TextColumn("Column", disabled=True),
+                                        "Header label (optional)": st.column_config.TextColumn(
+                                            "Header label (optional)",
+                                            help="Leave blank to use the original column name. This only changes how the header is displayed (does not rename data columns).",
+                                        ),
+                                    },
+                                    key=f"bt_header_editor_{st.session_state.get('bt_editor_version', 0)}",
+                                )
+
                             edited_df_visible = st.data_editor(
                                 df_visible,
                                 use_container_width=True,
@@ -4991,6 +5034,29 @@ if main_tab == "Create New Table":
                             if apply_clicked:
                                 # ✅ Save hidden columns
                                 st.session_state["bt_hidden_cols"] = st.session_state.get("bt_hidden_cols_draft", []) or []
+
+                                # ✅ Apply header label overrides (display only)
+                                try:
+                                    base_overrides = dict(st.session_state.get("bt_col_header_overrides_draft", {}) or {})
+                                except Exception:
+                                    base_overrides = {}
+
+                                # Update ONLY the currently visible columns; keep overrides for hidden columns
+                                try:
+                                    for _, rr in edited_hdr_df.iterrows():
+                                        orig = str(rr.get("Column", "") or "")
+                                        lbl = str(rr.get("Header label (optional)", "") or "").strip()
+                                        if not orig:
+                                            continue
+                                        if lbl == "" or lbl == orig:
+                                            base_overrides.pop(orig, None)
+                                        else:
+                                            base_overrides[orig] = lbl
+                                except Exception:
+                                    pass
+
+                                st.session_state["bt_col_header_overrides"] = base_overrides
+                                st.session_state["bt_col_header_overrides_draft"] = dict(base_overrides)
                             
                                 # ✅ Apply edited visible columns back into the full live df
                                 base = st.session_state["bt_df_uploaded"].copy()
