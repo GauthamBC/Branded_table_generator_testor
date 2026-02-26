@@ -2842,6 +2842,22 @@ def format_column_header(col_name: str, mode: str) -> str:
     return s
 
 
+
+def remove_markdown_formatting(text: str) -> str:
+    """Remove **bold** and *italic* markers while preserving the underlying text."""
+    if not text:
+        return ""
+    s = str(text)
+
+    # bold: **text**
+    s = re.sub(r"\*\*(.+?)\*\*", r"\1", s)
+
+    # italic: *text*
+    s = re.sub(r"\*(.+?)\*", r"\1", s)
+
+    return s
+
+
 def generate_table_html_from_df(
     df: pd.DataFrame,
     title: str,
@@ -5018,12 +5034,30 @@ if main_tab == "Create New Table":
                                     disabled=not show_header,
                                 )
 
-                                st.text_input(
-                                    "Table Subtitle",
-                                    key="bt_widget_subtitle",
-                                    placeholder="Subheading",
-                                    disabled=not show_header,
-                                )
+                                
+                                sub_c1, sub_c2 = st.columns([0.86, 0.14])
+                                with sub_c1:
+                                    st.text_input(
+                                        "Table Subtitle",
+                                        key="bt_widget_subtitle",
+                                        placeholder="Subheading",
+                                        disabled=not show_header,
+                                    )
+                                with sub_c2:
+                                    st.write("")  # align with input
+                                    st.write("")
+                                    if st.button(
+                                        "↺",
+                                        key="bt_reset_subtitle_format",
+                                        help="Clear formatting (Ctrl+\\)",
+                                        disabled=not show_header,
+                                        use_container_width=True,
+                                    ):
+                                        st.session_state["bt_widget_subtitle"] = remove_markdown_formatting(
+                                            st.session_state.get("bt_widget_subtitle", "")
+                                        )
+                                        st.rerun()
+
 
                                 st.caption("Shortcuts: **Ctrl/⌘+B** bold • **Ctrl/⌘+I** italic")
 
@@ -5187,14 +5221,33 @@ if main_tab == "Create New Table":
 
                                 st.caption("Shortcuts: **Ctrl/⌘+B** toggle bold • **Ctrl/⌘+I** toggle italic")
 
-                                st.text_area(
-                                    "Footer notes",
-                                    value=st.session_state.get("bt_footer_notes", ""),
-                                    key="bt_footer_notes",
-                                    height=140,
-                                    disabled=not (show_footer and show_footer_notes),
-                                    help="Bold: **text**  •  Italic: *text*",
-                                )
+                                
+                                fn_c1, fn_c2 = st.columns([0.86, 0.14])
+                                with fn_c1:
+                                    st.text_area(
+                                        "Footer notes",
+                                        value=st.session_state.get("bt_footer_notes", ""),
+                                        key="bt_footer_notes",
+                                        height=140,
+                                        disabled=not (show_footer and show_footer_notes),
+                                        help="Bold: **text**  •  Italic: *text*",
+                                    )
+                                with fn_c2:
+                                    st.write("")  # align with textarea
+                                    st.write("")
+                                    st.write("")
+                                    if st.button(
+                                        "↺",
+                                        key="bt_reset_footer_notes_format",
+                                        help="Clear formatting (Ctrl+\\)",
+                                        disabled=not (show_footer and show_footer_notes),
+                                        use_container_width=True,
+                                    ):
+                                        st.session_state["bt_footer_notes"] = remove_markdown_formatting(
+                                            st.session_state.get("bt_footer_notes", "")
+                                        )
+                                        st.rerun()
+
 
                                 components.html(
                                     """
